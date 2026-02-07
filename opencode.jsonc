@@ -12,5 +12,9 @@
   "model": "opencode/zen",
   "plugin": [
     "opencode-scheduler"
-  ]
+  ],
+  "reload": {
+    "auto": true,
+    "resume": true
+  }
 }

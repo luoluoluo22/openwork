@@ -1560,8 +1560,8 @@ export default function SessionView(props: SessionViewProps) {
                       onClick={() => {
                         handleSendPrompt({
                           mode: "prompt",
-                          text: "Help me set up browser automation.",
-                          parts: [{ type: "text", text: "Help me set up browser automation." }],
+                          text: "帮我来一个简单的剪辑",
+                          parts: [{ type: "text", text: "帮我来一个简单的剪辑" }],
                           attachments: [],
                         });
                       }}

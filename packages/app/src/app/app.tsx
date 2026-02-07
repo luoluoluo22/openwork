@@ -616,7 +616,12 @@ export default function App() {
   const initialDefaultModel = (() => {
     if (typeof window === "undefined") return DEFAULT_MODEL;
     try {
-      return parseModelRef(window.localStorage.getItem(MODEL_PREF_KEY)) || DEFAULT_MODEL;
+      const stored = parseModelRef(window.localStorage.getItem(MODEL_PREF_KEY));
+      // if stored is the old default (Claude 3.5 Sonnet), migrate to new DEFAULT_MODEL (OpenCode Zen)
+      if (stored && stored.providerID === "anthropic" && stored.modelID === "claude-3-5-sonnet") {
+        return DEFAULT_MODEL;
+      }
+      return stored || DEFAULT_MODEL;
     } catch {
       return DEFAULT_MODEL;
     }
@@ -2441,6 +2446,9 @@ export default function App() {
 
   const reloadToastVisible = createMemo(() => {
     if (!reloadRequired()) return false;
+    // 如果启用了自动重载且当前没有运行中的任务，隐藏弹窗，因为它会自动在后台处理
+    if (workspaceAutoReloadEnabled() && !anyActiveRuns()) return false;
+
     const lastTriggeredAt = reloadLastTriggeredAt();
     const dismissedAt = reloadToastDismissedAt();
     if (!lastTriggeredAt) return true;

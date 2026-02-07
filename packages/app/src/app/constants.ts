@@ -8,8 +8,8 @@ export const LANGUAGE_PREF_KEY = "openwork.language";
 export const HIDE_TITLEBAR_PREF_KEY = "openwork.hideTitlebar";
 
 export const DEFAULT_MODEL: ModelRef = {
-  providerID: "anthropic",
-  modelID: "claude-3-5-sonnet",
+  providerID: "opencode",
+  modelID: "zen",
 };
 
 export const SUGGESTED_PLUGINS: SuggestedPlugin[] = [
