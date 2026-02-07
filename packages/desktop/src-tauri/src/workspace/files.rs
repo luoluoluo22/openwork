@@ -1,18 +1,20 @@
-use std::collections::HashSet;
 use std::fs;
-use std::io::{Cursor, Read};
 use std::path::{Path, PathBuf};
-
-use zip::ZipArchive;
+use walkdir::WalkDir;
 
 use crate::types::{OpencodeCommand, WorkspaceOpenworkConfig};
 use crate::utils::now_ms;
 use crate::workspace::commands::{sanitize_command_name, serialize_command_frontmatter};
+use tauri::Manager;
 
 pub fn merge_plugins(existing: Vec<String>, required: &[&str]) -> Vec<String> {
     let mut out = existing;
     for plugin in required {
-        if !out.iter().any(|entry| entry == plugin) {
+        // 改进：检查时忽略版本号 (例如 opencode-scheduler@1.0.0 应该匹配 opencode-scheduler)
+        if !out.iter().any(|entry| {
+            let base_name = entry.split('@').next().unwrap_or(entry);
+            base_name == *plugin
+        }) {
             out.push(plugin.to_string());
         }
     }
@@ -176,104 +178,55 @@ Incremental adoption loop
     Ok(())
 }
 
-const ENTERPRISE_ARCHIVE_URL: &str =
-    "https://github.com/different-ai/openwork-enterprise/archive/refs/heads/main.zip";
-const ENTERPRISE_SEED_MARKER: &str = ".openwork-enterprise-creators";
-
-fn seed_enterprise_creator_skills(root: &PathBuf, skill_root: &PathBuf) -> Result<(), String> {
-    let marker_path = root.join(".opencode").join(ENTERPRISE_SEED_MARKER);
-    if marker_path.exists() {
+fn seed_built_in_skills(app: &tauri::AppHandle, skill_root: &PathBuf) -> Result<(), String> {
+    let resource_dir = app
+        .path()
+        .resource_dir()
+        .map_err(|e| format!("Failed to get resource dir: {e}"))?;
+ 
+    let built_in_root = resource_dir.join("resources").join("built-in-skills");
+    if !built_in_root.exists() {
         return Ok(());
     }
+ 
+    let entries = fs::read_dir(&built_in_root).map_err(|e| format!("Failed to read built-in root: {e}"))?;
+    for entry in entries.flatten() {
+        if !entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+            continue;
+        }
+        
+        let skill_name = entry.file_name();
+        let dest_skill_dir = skill_root.join(&skill_name);
+        
+        // 如果技能目录已存在，则认为已经同步过，跳过
+        if dest_skill_dir.exists() {
+            continue;
+        }
 
-    let mut existing = HashSet::new();
-    if let Ok(entries) = fs::read_dir(skill_root) {
-        for entry in entries.flatten() {
-            let name = entry.file_name().to_string_lossy().to_string();
-            if !name.is_empty() {
-                existing.insert(name);
+        let src_skill_dir = entry.path();
+        for file_entry in WalkDir::new(&src_skill_dir) {
+            let file_entry = file_entry.map_err(|e| format!("Failed to read built-in skill file: {e}"))?;
+            if !file_entry.file_type().is_file() {
+                continue;
             }
+ 
+            let src_path = file_entry.path();
+            let rel_path = src_path
+                .strip_prefix(&src_skill_dir)
+                .map_err(|e| format!("Failed to compute relative path: {e}"))?;
+            
+            let dest_path = dest_skill_dir.join(rel_path);
+ 
+            if let Some(parent) = dest_path.parent() {
+                fs::create_dir_all(parent)
+                    .map_err(|e| format!("Failed to create parent dir {}: {e}", parent.display()))?;
+            }
+ 
+            fs::copy(src_path, &dest_path)
+                .map_err(|e| format!("Failed to copy {} to {}: {e}", src_path.display(), dest_path.display()))?;
         }
     }
-
-    let agent = ureq::AgentBuilder::new().redirects(5).build();
-    let response = agent
-        .get(ENTERPRISE_ARCHIVE_URL)
-        .call()
-        .map_err(|e| format!("Failed to download enterprise archive: {e}"))?;
-
-    let mut buffer = Vec::new();
-    response
-        .into_reader()
-        .read_to_end(&mut buffer)
-        .map_err(|e| format!("Failed to read enterprise archive: {e}"))?;
-
-    let cursor = Cursor::new(buffer);
-    let mut archive =
-        ZipArchive::new(cursor).map_err(|e| format!("Failed to open enterprise archive: {e}"))?;
-
-    for i in 0..archive.len() {
-        let mut entry = archive
-            .by_index(i)
-            .map_err(|e| format!("Failed to read enterprise entry: {e}"))?;
-        let name = entry.name().to_string();
-        let entry_path = Path::new(&name);
-        if entry_path.components().any(|component| match component {
-            std::path::Component::ParentDir
-            | std::path::Component::RootDir
-            | std::path::Component::Prefix(_) => true,
-            _ => false,
-        }) {
-            continue;
-        }
-
-        let parts: Vec<String> = entry_path
-            .components()
-            .map(|component| component.as_os_str().to_string_lossy().to_string())
-            .collect();
-        if parts.len() < 5 {
-            continue;
-        }
-        if parts[1] != ".opencode" || parts[2] != "skills" {
-            continue;
-        }
-
-        let skill_name = &parts[3];
-        if !skill_name.ends_with("-creator") {
-            continue;
-        }
-        if existing.contains(skill_name) {
-            continue;
-        }
-
-        let dest_root = skill_root.join(skill_name);
-        let mut dest_path = dest_root.clone();
-        for part in parts.iter().skip(4) {
-            dest_path = dest_path.join(part);
-        }
-
-        if name.ends_with('/') {
-            fs::create_dir_all(&dest_path)
-                .map_err(|e| format!("Failed to create {}: {e}", dest_path.display()))?;
-            continue;
-        }
-
-        if let Some(parent) = dest_path.parent() {
-            fs::create_dir_all(parent)
-                .map_err(|e| format!("Failed to create {}: {e}", parent.display()))?;
-        }
-
-        let mut file_buffer = Vec::new();
-        entry
-            .read_to_end(&mut file_buffer)
-            .map_err(|e| format!("Failed to read enterprise entry: {e}"))?;
-        fs::write(&dest_path, file_buffer)
-            .map_err(|e| format!("Failed to write {}: {e}", dest_path.display()))?;
-    }
-
-    fs::write(&marker_path, "seeded\n")
-        .map_err(|e| format!("Failed to write {}: {e}", marker_path.display()))?;
-
+ 
     Ok(())
 }
 
@@ -343,18 +296,18 @@ fn seed_commands(commands_dir: &PathBuf, preset: &str) -> Result<(), String> {
     Ok(())
 }
 
-pub fn ensure_workspace_files(workspace_path: &str, preset: &str) -> Result<(), String> {
+pub fn ensure_workspace_files(app: &tauri::AppHandle, workspace_path: &str, preset: &str) -> Result<(), String> {
     let root = PathBuf::from(workspace_path);
-
+ 
     let skill_root = root.join(".opencode").join("skills");
     fs::create_dir_all(&skill_root)
         .map_err(|e| format!("Failed to create .opencode/skills: {e}"))?;
     seed_workspace_guide(&skill_root)?;
+    seed_built_in_skills(app, &skill_root)?;
     if preset == "starter" {
         seed_get_started_skill(&skill_root)?;
-        if let Err(err) = seed_enterprise_creator_skills(&root, &skill_root) {
-            println!("[workspace] Failed to seed creator skills: {err}");
-        }
+        // ❌ 核心修复：移除这里同步联网下载的 seed_enterprise_creator_skills
+        // 它在网络不佳时（如国内 GitHub 访问）会导致界面彻底卡死
     }
 
     let agents_dir = root.join(".opencode").join("agents");

@@ -3,12 +3,14 @@ import { render } from "solid-js/web";
 import { HashRouter, Route, Router } from "@solidjs/router";
 
 import { bootstrapTheme } from "./app/theme";
+import { initLocale } from "./i18n";
 import "./app/index.css";
 import AppEntry from "./app/entry";
 import { PlatformProvider, type Platform } from "./app/context/platform";
 import { isTauriRuntime } from "./app/utils";
 
 bootstrapTheme();
+initLocale();
 
 const root = document.getElementById("root");
 

@@ -31,6 +31,7 @@ use commands::owpenbot::{
 };
 use commands::skills::{
     install_skill_template, list_local_skills, read_local_skill, uninstall_skill, write_local_skill,
+    write_skill_file, get_python_path,
 };
 use commands::updater::updater_environment;
 use commands::window::set_window_decorations;
@@ -46,6 +47,21 @@ use owpenbot::manager::OwpenbotManager;
 use workspace::watch::WorkspaceWatchState;
 
 pub fn run() {
+    // --- 自动注入内置 Python 到 PATH ---
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Some(bin_dir) = exe_path.parent() {
+            // 在安装版中，resources 通常与 exe 在同级或特定目录下
+            // 我们在开发环境下也做一个探测
+            let python_runtime = bin_dir.join("resources").join("python-runtime");
+            if python_runtime.exists() {
+                if let Ok(old_path) = std::env::var("PATH") {
+                    let new_path = format!("{};{}", python_runtime.to_string_lossy(), old_path);
+                    std::env::set_var("PATH", new_path);
+                }
+            }
+        }
+    }
+
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_http::init())
@@ -104,6 +120,8 @@ pub fn run() {
             read_local_skill,
             uninstall_skill,
             write_local_skill,
+            write_skill_file,
+            get_python_path,
             read_opencode_config,
             write_opencode_config,
             updater_environment,

@@ -1,0 +1,24 @@
+修改完成后，为了在 Windows 上正常启动二次开发环境，你需要打开 两个 PowerShell 终端：
+
+终端 1：启动前端 UI
+首先启动 UI 开发服务器，让它监听在 5173 端口：
+
+powershell
+pnpm dev:ui
+
+终端 2：启动桌面容器（Tauri）
+等第一个终端显示 Local: http://localhost:5173/ 后，在第二个终端运行：
+
+
+taskkill /F /IM openwork.exe /T; taskkill /F /IM cargo.exe /T; taskkill /F /IM rustc.exe /T; taskkill /F /IM node.exe /T; taskkill /F /IM python.exe /T; echo "Nuclear cleanup done."
+
+powershell
+pnpm dev
+
+$env:OPENCODE_VERSION="1.1.53"; pnpm dev
+
+📦 如何打包成 .exe 客户端？
+当你完成开发准备发布时，请运行：
+
+powershell
+pnpm build

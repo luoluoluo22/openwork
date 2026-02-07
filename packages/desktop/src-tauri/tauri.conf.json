@@ -4,7 +4,7 @@
   "version": "0.11.25",
   "identifier": "com.differentai.openwork",
   "build": {
-    "beforeDevCommand": "pnpm -C ../.. --filter @different-ai/openwork run prepare:sidecar && pnpm -w dev:ui",
+    "beforeDevCommand": "",
     "beforeBuildCommand": "pnpm -C ../.. --filter @different-ai/openwork run prepare:sidecar && pnpm -w build:ui",
     "devUrl": "http://localhost:5173",
     "frontendDist": "../../app/dist"
@@ -34,11 +34,8 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "externalBin": [
-      "sidecars/opencode",
-      "sidecars/openwork-server",
-      "sidecars/owpenbot",
-      "sidecars/openwrk"
+    "resources": [
+      "resources/built-in-skills/**/*"
     ]
   },
   "plugins": {

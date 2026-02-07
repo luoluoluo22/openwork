@@ -7,6 +7,7 @@ import type { McpStatusMap } from "../types";
 import { getOwpenbotStatus } from "../lib/tauri";
 
 import Button from "./button";
+import { t, currentLocale } from "../../i18n";
 
 type StatusBarProps = {
   clientConnected: boolean;
@@ -21,42 +22,43 @@ type StatusBarProps = {
 };
 
 export default function StatusBar(props: StatusBarProps) {
+  const tr = (key: string) => t(key, currentLocale());
   const [owpenbotStatus, setOwpenbotStatus] = createSignal<OwpenbotStatus | null>(null);
   const [documentVisible, setDocumentVisible] = createSignal(true);
 
   const opencodeStatusMeta = createMemo(() => ({
     dot: props.clientConnected ? "bg-green-9" : "bg-gray-6",
     text: props.clientConnected ? "text-green-11" : "text-gray-10",
-    label: props.clientConnected ? "Connected" : "Not connected",
+    label: props.clientConnected ? tr("session.status_bar.connected") : tr("session.status_bar.not_connected"),
   }));
 
   const openworkStatusMeta = createMemo(() => {
     switch (props.openworkServerStatus) {
       case "connected":
-        return { dot: "bg-green-9", text: "text-green-11", label: "Ready" };
+        return { dot: "bg-green-9", text: "text-green-11", label: tr("session.status_bar.ready") };
       case "limited":
-        return { dot: "bg-amber-9", text: "text-amber-11", label: "Limited access" };
+        return { dot: "bg-amber-9", text: "text-amber-11", label: tr("session.status_bar.limited") };
       default:
-        return { dot: "bg-gray-6", text: "text-gray-10", label: "Unavailable" };
+        return { dot: "bg-gray-6", text: "text-gray-10", label: tr("session.status_bar.unavailable") };
     }
   });
 
   const messagingMeta = createMemo(() => {
     const status = owpenbotStatus();
     if (!status) {
-      return { dot: "bg-gray-6", text: "text-gray-10", label: "Messaging bridge unavailable" };
+      return { dot: "bg-gray-6", text: "text-gray-10", label: tr("session.status_bar.messaging_bridge_unavailable") };
     }
     const whatsappLinked = status.whatsapp.linked;
     const telegramConfigured = status.telegram.configured;
     const slackConfigured = status.slack.configured;
     const configuredCount = [whatsappLinked, telegramConfigured, slackConfigured].filter(Boolean).length;
     if (status.running && configuredCount > 0) {
-      return { dot: "bg-green-9", text: "text-green-11", label: "Messaging bridge ready" };
+      return { dot: "bg-green-9", text: "text-green-11", label: tr("session.status_bar.messaging_bridge_ready") };
     }
     if (configuredCount > 0 || status.running) {
-      return { dot: "bg-amber-9", text: "text-amber-11", label: "Messaging bridge setup" };
+      return { dot: "bg-amber-9", text: "text-amber-11", label: tr("session.status_bar.messaging_bridge_setup") };
     }
-    return { dot: "bg-gray-6", text: "text-gray-10", label: "Messaging bridge offline" };
+    return { dot: "bg-gray-6", text: "text-gray-10", label: tr("session.status_bar.messaging_bridge_offline") };
   });
 
   type ProTip = {
@@ -80,7 +82,7 @@ export default function StatusBar(props: StatusBarProps) {
   const proTips = createMemo<ProTip[]>(() => [
     {
       id: "slack",
-      label: "Connect Slack",
+      label: tr("session.status_bar.tip_slack"),
       enabled: () => {
         const status = owpenbotStatus();
         return Boolean(status && !status.slack.configured);
@@ -89,7 +91,7 @@ export default function StatusBar(props: StatusBarProps) {
     },
     {
       id: "telegram",
-      label: "Connect Telegram",
+      label: tr("session.status_bar.tip_telegram"),
       enabled: () => {
         const status = owpenbotStatus();
         return Boolean(status && !status.telegram.configured);
@@ -98,7 +100,7 @@ export default function StatusBar(props: StatusBarProps) {
     },
     {
       id: "whatsapp",
-      label: "Connect WhatsApp",
+      label: tr("session.status_bar.tip_whatsapp"),
       enabled: () => {
         const status = owpenbotStatus();
         return Boolean(status && !status.whatsapp.linked);
@@ -107,13 +109,13 @@ export default function StatusBar(props: StatusBarProps) {
     },
     {
       id: "notion",
-      label: "Connect Notion MCP",
+      label: tr("session.status_bar.tip_notion"),
       enabled: () => notionStatus() !== "connected",
       action: () => runAction(props.onOpenMcp),
     },
     {
       id: "providers",
-      label: "Use your own models (OpenRouter, Anthropic, OpenAI)",
+      label: tr("session.status_bar.tip_providers"),
       enabled: () => props.clientConnected && providerConnectedCount() === 0,
       action: () => runAction(props.onOpenProviders),
     },
@@ -232,7 +234,7 @@ export default function StatusBar(props: StatusBarProps) {
               title={activeTip()?.label}
               aria-label={activeTip()?.label}
             >
-              <span class="uppercase tracking-[0.2em] text-[10px] text-gray-8">Tip</span>
+              <span class="uppercase tracking-[0.2em] text-[10px] text-gray-8">{tr("session.status_bar.tip")}</span>
               <span class="text-gray-11 font-medium">{activeTip()?.label}</span>
             </button>
           </Show>
@@ -244,7 +246,7 @@ export default function StatusBar(props: StatusBarProps) {
           >
             <Settings class="w-4 h-4" />
             <Show when={props.developerMode}>
-              <span class="text-gray-11 font-medium">Settings</span>
+              <span class="text-gray-11 font-medium">{tr("session.sidebar.settings")}</span>
             </Show>
           </Button>
         </div>

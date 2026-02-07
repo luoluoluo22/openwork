@@ -326,11 +326,10 @@ export default function SessionSidebar(props: SidebarProps) {
 
                   return (
                     <div
-                      class={`space-y-2 rounded-lg border transition-colors overflow-hidden ${
-                        isActive()
-                          ? "border-indigo-7/40 bg-indigo-2/20"
-                          : "border-gray-6/40 bg-transparent"
-                      } ${isConnecting() ? "opacity-70" : ""} ${dragOver() ? "ring-1 ring-indigo-7/50" : ""}`.trim()}
+                      class={`space-y-2 rounded-lg border transition-colors overflow-hidden ${isActive()
+                        ? "border-indigo-7/40 bg-indigo-2/20"
+                        : "border-gray-6/40 bg-transparent"
+                        } ${isConnecting() ? "opacity-70" : ""} ${dragOver() ? "ring-1 ring-indigo-7/50" : ""}`.trim()}
                       onDragOver={(event) => handleDragOver(event, group.workspace.id)}
                       onDragLeave={() => handleDragLeave(group.workspace.id)}
                       onDrop={(event) => handleDrop(event, group.workspace.id)}
@@ -338,11 +337,10 @@ export default function SessionSidebar(props: SidebarProps) {
                       <div class="flex items-start gap-2 px-2 py-2">
                         <button
                           type="button"
-                          class={`flex-1 text-left rounded-md px-1.5 py-1 transition-colors ${
-                            isActive()
-                              ? "text-gray-12"
-                              : "text-gray-11 hover:text-gray-12 hover:bg-gray-2"
-                          }`}
+                          class={`flex-1 text-left rounded-md px-1.5 py-1 transition-colors ${isActive()
+                            ? "text-gray-12"
+                            : "text-gray-11 hover:text-gray-12 hover:bg-gray-2"
+                            }`}
                           onClick={() => {
                             if (isActive() || isConnecting()) return;
                             if (!allowActions()) return;
@@ -459,48 +457,60 @@ export default function SessionSidebar(props: SidebarProps) {
                           >
                             <For each={visibleSessions()}>
                               {(session) => (
-                                <button
-                                  class={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
-                                    session.id === props.selectedSessionId
+                                <div class="group relative w-full">
+                                  <button
+                                    class={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${session.id === props.selectedSessionId
                                       ? "bg-gray-3 text-gray-12 font-medium"
-                                      : "text-gray-11 hover:text-gray-12 hover:bg-gray-2"
-                                  } ${!allowActions() ? "opacity-70" : ""}`}
-                                  onClick={() => {
-                                    if (!allowActions()) return;
-                                    props.onSelectSession(group.workspace.id, session.id);
-                                  }}
-                                  onContextMenu={(event) => {
-                                    if (!isActive()) return;
-                                    openContextMenu(event, session.id);
-                                  }}
-                                  disabled={!allowActions()}
-                                >
-                                  <div class="flex items-center justify-between gap-2 w-full overflow-hidden">
-                                    <div class="truncate">{session.title}</div>
-                                    <Show
-                                      when={
-                                        props.sessionStatusById[session.id] &&
-                                        props.sessionStatusById[session.id] !== "idle"
-                                      }
-                                    >
-                                      <span
-                                        class={`shrink-0 text-[10px] px-1.5 py-0.5 rounded-full border flex items-center gap-1 ${
-                                          props.sessionStatusById[session.id] === "running"
+                                      : "text-gray-11 group-hover:text-gray-12 group-hover:bg-gray-2"
+                                      } ${!allowActions() ? "opacity-70" : ""}`}
+                                    onClick={() => {
+                                      if (!allowActions()) return;
+                                      props.onSelectSession(group.workspace.id, session.id);
+                                    }}
+                                    onContextMenu={(event) => {
+                                      if (!isActive()) return;
+                                      openContextMenu(event, session.id);
+                                    }}
+                                    disabled={!allowActions()}
+                                  >
+                                    <div class="flex items-center justify-between gap-2 w-full overflow-hidden pr-6">
+                                      <div class="truncate">{session.title}</div>
+                                      <Show
+                                        when={
+                                          props.sessionStatusById[session.id] &&
+                                          props.sessionStatusById[session.id] !== "idle"
+                                        }
+                                      >
+                                        <span
+                                          class={`shrink-0 text-[10px] px-1.5 py-0.5 rounded-full border flex items-center gap-1 ${props.sessionStatusById[session.id] === "running"
                                             ? "border-amber-7/50 text-amber-11 bg-amber-2/50"
                                             : "border-gray-7/50 text-gray-10 bg-gray-2/50"
-                                        }`}
-                                      >
-                                        <div
-                                          class={`w-1 h-1 rounded-full ${
-                                            props.sessionStatusById[session.id] === "running"
+                                            }`}
+                                        >
+                                          <div
+                                            class={`w-1 h-1 rounded-full ${props.sessionStatusById[session.id] === "running"
                                               ? "bg-amber-9 animate-pulse"
                                               : "bg-gray-9"
-                                          }`}
-                                        />
-                                      </span>
-                                    </Show>
-                                  </div>
-                                </button>
+                                              }`}
+                                          />
+                                        </span>
+                                      </Show>
+                                    </div>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    class="absolute right-2 top-1/2 -translate-y-1/2 z-10 opacity-0 group-hover:opacity-100 p-1.5 rounded-md text-gray-10 hover:text-red-11 hover:bg-gray-4 transition-all"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (confirm("Are you sure you want to delete this session?")) {
+                                        props.onDeleteSession(session.id);
+                                      }
+                                    }}
+                                    title="Delete session"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                </div>
                               )}
                             </For>
                             <Show when={hasMoreSessions()}>
@@ -586,9 +596,8 @@ export default function SessionSidebar(props: SidebarProps) {
                 <span>Progress</span>
                 <ChevronDown
                   size={16}
-                  class={`transition-transform text-gray-10 ${
-                    props.expandedSections.progress ? "rotate-180" : ""
-                  }`.trim()}
+                  class={`transition-transform text-gray-10 ${props.expandedSections.progress ? "rotate-180" : ""
+                    }`.trim()}
                 />
               </button>
               <Show when={props.expandedSections.progress}>
@@ -597,11 +606,10 @@ export default function SessionSidebar(props: SidebarProps) {
                     <For each={progressDots()}>
                       {(done) => (
                         <div
-                          class={`h-6 w-6 rounded-full border flex items-center justify-center transition-colors ${
-                            done
-                              ? "border-green-6 bg-green-2 text-green-11"
-                              : "border-gray-6 bg-gray-1 text-gray-8"
-                          }`}
+                          class={`h-6 w-6 rounded-full border flex items-center justify-center transition-colors ${done
+                            ? "border-green-6 bg-green-2 text-green-11"
+                            : "border-gray-6 bg-gray-1 text-gray-8"
+                            }`}
                         >
                           <Show when={done}>
                             <Check size={14} />

@@ -16,6 +16,8 @@ export type SkillsViewProps = {
   skillsStatus: string | null;
   importLocalSkill: () => void;
   installSkillCreator: () => void;
+  installOpkgSkill: (pkg: string) => void;
+  installJianyingSkillDirect: () => void;
   revealSkillsFolder: () => void;
   uninstallSkill: (name: string) => void;
   readSkill: (name: string) => Promise<{ name: string; path: string; content: string } | null>;
@@ -30,6 +32,10 @@ export default function SkillsView(props: SkillsViewProps) {
 
   const skillCreatorInstalled = createMemo(() =>
     props.skills.some((skill) => skill.name === "skill-creator")
+  );
+
+  const jianyingInstalled = createMemo(() =>
+    props.skills.some((skill) => skill.name === "jianying-editor")
   );
 
   const [uninstallTarget, setUninstallTarget] = createSignal<SkillCard | null>(null);
@@ -62,6 +68,14 @@ export default function SkillsView(props: SkillsViewProps) {
       icon: Sparkles,
       onClick: () => props.installSkillCreator(),
       disabled: props.busy || skillCreatorInstalled() || !props.canInstallSkillCreator,
+    },
+    {
+      id: "jianying-editor",
+      title: translate("skills.jianying_editor_title"),
+      description: translate("skills.jianying_editor_card_description"),
+      icon: Package,
+      onClick: () => props.installJianyingSkillDirect(),
+      disabled: props.busy || jianyingInstalled() || !props.canUseDesktopTools,
     },
     {
       id: "import-local",
@@ -153,11 +167,10 @@ export default function SkillsView(props: SkillsViewProps) {
           type="button"
           onClick={() => props.refreshSkills({ force: true })}
           disabled={props.busy}
-          class={`flex items-center gap-1.5 text-xs font-medium transition-colors ${
-            props.busy
-              ? "text-dls-secondary"
-              : "text-dls-secondary hover:text-dls-text"
-          }`}
+          class={`flex items-center gap-1.5 text-xs font-medium transition-colors ${props.busy
+            ? "text-dls-secondary"
+            : "text-dls-secondary hover:text-dls-text"
+            }`}
         >
           <RefreshCw size={14} />
           {translate("skills.refresh")}
@@ -176,11 +189,10 @@ export default function SkillsView(props: SkillsViewProps) {
           type="button"
           onClick={handleNewSkill}
           disabled={newSkillDisabled()}
-          class={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-            newSkillDisabled()
-              ? "bg-dls-active text-dls-secondary"
-              : "bg-dls-text text-dls-surface hover:opacity-90"
-          }`}
+          class={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${newSkillDisabled()
+            ? "bg-dls-active text-dls-secondary"
+            : "bg-dls-text text-dls-surface hover:opacity-90"
+            }`}
         >
           <Plus size={14} />
           New skill
@@ -195,6 +207,11 @@ export default function SkillsView(props: SkillsViewProps) {
             Learn more
           </button>
         </p>
+        <Show when={props.skillsStatus}>
+          <div class="mt-4 p-3 bg-dls-hover border border-dls-border rounded-lg text-xs text-dls-accent animate-pulse">
+            {props.skillsStatus}
+          </div>
+        </Show>
         <Show when={props.accessHint}>
           <div class="text-xs text-dls-secondary">{props.accessHint}</div>
         </Show>
@@ -269,11 +286,10 @@ export default function SkillsView(props: SkillsViewProps) {
                     </button>
                     <button
                       type="button"
-                      class={`p-1.5 rounded-md transition-colors ${
-                        props.busy || !props.canUseDesktopTools
-                          ? "text-dls-secondary opacity-40"
-                          : "text-dls-secondary hover:text-red-11 hover:bg-red-3/10"
-                      }`}
+                      class={`p-1.5 rounded-md transition-colors ${props.busy || !props.canUseDesktopTools
+                        ? "text-dls-secondary opacity-40"
+                        : "text-dls-secondary hover:text-red-11 hover:bg-red-3/10"
+                        }`}
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
@@ -304,11 +320,10 @@ export default function SkillsView(props: SkillsViewProps) {
               <div class="flex items-center gap-2">
                 <button
                   type="button"
-                  class={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-                    selectedDirty() && !props.busy
-                      ? "bg-dls-text text-dls-surface hover:opacity-90"
-                      : "bg-dls-active text-dls-secondary"
-                  }`}
+                  class={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${selectedDirty() && !props.busy
+                    ? "bg-dls-text text-dls-surface hover:opacity-90"
+                    : "bg-dls-active text-dls-secondary"
+                    }`}
                   disabled={!selectedDirty() || props.busy}
                   onClick={() => void saveSelectedSkill()}
                 >
@@ -368,11 +383,10 @@ export default function SkillsView(props: SkillsViewProps) {
                 </div>
                 <button
                   type="button"
-                  class={`p-1.5 rounded-md transition-colors ${
-                    item.disabled
-                      ? "text-dls-secondary opacity-40"
-                      : "text-dls-secondary hover:text-dls-text hover:bg-dls-hover"
-                  }`}
+                  class={`p-1.5 rounded-md transition-colors ${item.disabled
+                    ? "text-dls-secondary opacity-40"
+                    : "text-dls-secondary hover:text-dls-text hover:bg-dls-hover"
+                    }`}
                   onClick={() => {
                     if (item.disabled) return;
                     item.onClick();

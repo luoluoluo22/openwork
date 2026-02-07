@@ -26,9 +26,44 @@ if (shortHostname && shortHostname !== hostname) {
 export default defineConfig({
   plugins: [tailwindcss(), solid()],
   server: {
+    host: '127.0.0.1',
     port: devPort,
     strictPort: true,
     ...(allowedHosts.size > 0 ? { allowedHosts: Array.from(allowedHosts) } : {}),
+    proxy: {
+      '/w': {
+        target: 'http://127.0.0.1:8787',
+        changeOrigin: true,
+      },
+      '/m': {
+        target: 'http://127.0.0.1:8787',
+        changeOrigin: true,
+      },
+      '/opencode': {
+        target: 'http://127.0.0.1:8787',
+        changeOrigin: true,
+      },
+      '/health': {
+        target: 'http://127.0.0.1:8787',
+        changeOrigin: true,
+      },
+      '/status': {
+        target: 'http://127.0.0.1:8787',
+        changeOrigin: true,
+      },
+      '/workspaces': {
+        target: 'http://127.0.0.1:8787',
+        changeOrigin: true,
+      },
+      '/capabilities': {
+        target: 'http://127.0.0.1:8787',
+        changeOrigin: true,
+      },
+      '/workspace': {
+        target: 'http://127.0.0.1:8787',
+        changeOrigin: true,
+      },
+    },
   },
   build: {
     target: "esnext",

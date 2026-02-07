@@ -6,9 +6,11 @@ use std::path::PathBuf;
 use std::os::unix::fs::PermissionsExt;
 
 fn main() {
-  ensure_opencode_sidecar();
-  ensure_openwork_server_sidecar();
-  ensure_owpenbot_sidecar();
+  // 临时禁用 sidecar 设置，因为 Windows 文件锁问题
+  // ensure_opencode_sidecar();
+  // ensure_openwork_server_sidecar();
+  // ensure_owpenbot_sidecar();
+  
   tauri_build::build();
 }
 

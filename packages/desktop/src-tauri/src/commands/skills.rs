@@ -1,4 +1,5 @@
 use serde::Serialize;
+use tauri::Manager;
 use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -402,6 +403,49 @@ pub fn write_local_skill(
         stderr: String::new(),
     })
 }
+ 
+#[tauri::command]
+pub fn write_skill_file(
+    project_dir: String,
+    skill_name: String,
+    subsite_path: String,
+    content: String,
+) -> Result<ExecResult, String> {
+    let project_dir = project_dir.trim();
+    if project_dir.is_empty() {
+        return Err("projectDir is required".to_string());
+    }
+ 
+    let skill_name = validate_skill_name(&skill_name)?;
+    let skill_root = ensure_project_skill_root(project_dir)?;
+    let skill_dir = skill_root.join(&skill_name);
+ 
+    if !skill_dir.exists() {
+        fs::create_dir_all(&skill_dir)
+            .map_err(|e| format!("Failed to create skill directory {}: {e}", skill_dir.display()))?;
+    }
+ 
+    // 防止路径穿越攻击 (Security)
+    if subsite_path.contains("..") || subsite_path.starts_with('/') || subsite_path.starts_with('\\') {
+        return Err("Invalid subpath".to_string());
+    }
+ 
+    let dest_path = skill_dir.join(&subsite_path);
+    if let Some(parent) = dest_path.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create parent directory: {e}"))?;
+    }
+ 
+    fs::write(&dest_path, content)
+        .map_err(|e| format!("Failed to write file {}: {e}", dest_path.display()))?;
+ 
+    Ok(ExecResult {
+        ok: true,
+        status: 0,
+        stdout: format!("Written to {}", subsite_path),
+        stderr: String::new(),
+    })
+}
 
 #[tauri::command]
 pub fn install_skill_template(
@@ -447,6 +491,26 @@ pub fn install_skill_template(
         stdout: format!("Installed skill to {}", dest.display()),
         stderr: String::new(),
     })
+}
+
+#[tauri::command]
+pub fn get_python_path(app: tauri::AppHandle) -> Result<String, String> {
+    let resource_dir = app
+        .path()
+        .resource_dir()
+        .map_err(|e| format!("Failed to get resource dir: {e}"))?;
+
+    let python_exe = resource_dir
+        .join("resources")
+        .join("python-runtime")
+        .join("python.exe");
+
+    if python_exe.exists() {
+        Ok(python_exe.to_string_lossy().to_string())
+    } else {
+        // 兜底返回系统 python
+        Ok("python".to_string())
+    }
 }
 
 #[tauri::command]

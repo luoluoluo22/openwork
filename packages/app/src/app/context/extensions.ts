@@ -20,7 +20,9 @@ import {
   readLocalSkill,
   uninstallSkill as uninstallSkillCommand,
   writeLocalSkill,
+  writeSkillFile,
   pickDirectory,
+  opkgInstall,
   readOpencodeConfig,
   writeOpencodeConfig,
   type OpencodeConfigFile,
@@ -127,11 +129,11 @@ export function createExtensionsStore(options: {
         if (refreshSkillsAborted) return;
         const next: SkillCard[] = Array.isArray(response.items)
           ? response.items.map((entry) => ({
-              name: entry.name,
-              description: entry.description,
-              path: entry.path,
-              trigger: entry.trigger,
-            }))
+            name: entry.name,
+            description: entry.description,
+            path: entry.path,
+            trigger: entry.trigger,
+          }))
           : [];
         setSkills(next);
         if (!next.length) {
@@ -175,11 +177,11 @@ export function createExtensionsStore(options: {
 
         const next: SkillCard[] = Array.isArray(local)
           ? local.map((entry) => ({
-              name: entry.name,
-              description: entry.description,
-              path: entry.path,
-              trigger: entry.trigger,
-            }))
+            name: entry.name,
+            description: entry.description,
+            path: entry.path,
+            trigger: entry.trigger,
+          }))
           : [];
 
         setSkills(next);
@@ -248,10 +250,10 @@ export function createExtensionsStore(options: {
 
       const next: SkillCard[] = Array.isArray(data)
         ? data.map((entry) => ({
-            name: entry.name,
-            description: entry.description,
-            path: formatSkillPath(entry.location),
-          }))
+          name: entry.name,
+          description: entry.description,
+          path: formatSkillPath(entry.location),
+        }))
         : [];
 
       setSkills(next);
@@ -643,6 +645,112 @@ export function createExtensionsStore(options: {
     }
   }
 
+  async function installOpkgSkill(pkg: string) {
+    const root = options.activeWorkspaceRoot().trim();
+    if (!root) {
+      setSkillsStatus(translate("skills.pick_workspace_first"));
+      return;
+    }
+
+    options.setBusy(true);
+    options.setError(null);
+    setSkillsStatus(translate("skills.installing_opackage"));
+    console.log("[ExtensionStore] Installing opkg skill:", pkg);
+
+    try {
+      const result = await opkgInstall(root, pkg);
+      console.log("[ExtensionStore] opkgInstall result:", result);
+      if (!result.ok) {
+        setSkillsStatus(result.stderr || result.stdout || translate("skills.install_failed"));
+      } else {
+        setSkillsStatus(result.stdout || translate("skills.install_complete"));
+        options.markReloadRequired("skills", { type: "skill", action: "added" });
+      }
+      await refreshSkills({ force: true });
+    } catch (e) {
+      const message = e instanceof Error ? e.message : translate("skills.unknown_error");
+      options.setError(addOpencodeCacheHint(message));
+    } finally {
+      options.setBusy(false);
+    }
+  }
+
+  async function installJianyingSkillDirect() {
+    const root = options.activeWorkspaceRoot().trim();
+    if (!root) {
+      setSkillsStatus(translate("skills.pick_workspace_first"));
+      return;
+    }
+
+    options.setBusy(true);
+    options.setError(null);
+    setSkillsStatus("正在从 GitHub 云端获取最新剪映技能...");
+
+    try {
+      // 直接下载 GitHub 的原始文件
+      const response = await fetch("https://raw.githubusercontent.com/luoluoluo22/jianying-editor-skill/main/SKILL.md");
+      if (!response.ok) throw new Error("无法连接到 GitHub 资源服务器");
+
+      let content = await response.text();
+
+      if (content.includes("<!DOCTYPE html>") || content.includes("<html>")) {
+        throw new Error("下载内容格式异常，请稍后再试或检查网络加速");
+      }
+
+      // 强制统一使用 jianying-editor 作为 ID，去掉旧头，补充简洁的英文头以防解析失败
+      content = content.replace(/^---[\s\S]*?---\n*/, "");
+      const finalContent = `---\nname: jianying-editor\ndescription: AI-powered video editing automation for JianYing Pro.\n---\n\n` + content;
+
+      console.log("[ExtensionStore] Final content prepared, length:", finalContent.length);
+
+      // 使用 installSkillTemplate
+      const result = await installSkillTemplate(root, "jianying-editor", finalContent, { overwrite: true });
+      console.log("[ExtensionStore] installSkillTemplate result:", result);
+
+      // 3. 定义需要下载的完整文件列表
+      const filesToDownload = [
+        "rules/setup.md",
+        "rules/core.md",
+        "rules/media.md",
+        "rules/text.md",
+        "rules/keyframes.md",
+        "rules/effects.md",
+        "rules/recording.md",
+        "rules/web-vfx.md",
+        "rules/generative.md",
+        "rules/audio-voice.md",
+        "examples/my_first_vlog.py",
+        "examples/simple_clip_demo.py",
+        "examples/compound_clip_demo.py"
+      ];
+
+      setSkillsStatus(`正在通过极速通道下载完整技能包 (1/16)...`);
+
+      // 4. 并行下载所有子文件
+      await Promise.all(filesToDownload.map(async (path, index) => {
+        try {
+          const res = await fetch(`https://raw.githubusercontent.com/luoluoluo22/jianying-editor-skill/main/${path}`);
+          if (res.ok) {
+            const fileContent = await res.text();
+            await writeSkillFile(root, "jianying-editor", path, fileContent);
+            console.log(`[DirectInstall] Downloaded: ${path}`);
+          }
+        } catch (e) {
+          console.error(`Failed to download ${path}:`, e);
+        }
+      }));
+
+      setSkillsStatus("✨ 剪映辅助技能包已完整内置！");
+      options.markReloadRequired("skills", { type: "skill", name: "jianying-editor", action: "added" });
+      await refreshSkills({ force: true });
+    } catch (e) {
+      console.error("Direct install failed:", e);
+      setSkillsStatus("下载失败：请检查网络连接 (建议开启工具加速 GitHub)");
+    } finally {
+      options.setBusy(false);
+    }
+  }
+
   async function revealSkillsFolder() {
     if (!isTauriRuntime()) {
       setSkillsStatus(translate("skills.desktop_required"));
@@ -894,6 +1002,8 @@ export function createExtensionsStore(options: {
     addPlugin,
     importLocalSkill,
     installSkillCreator,
+    installOpkgSkill,
+    installJianyingSkillDirect,
     revealSkillsFolder,
     uninstallSkill,
     readSkill,

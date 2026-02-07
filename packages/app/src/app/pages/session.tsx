@@ -38,6 +38,7 @@ import {
   Settings,
   Shield,
   SlidersHorizontal,
+  Trash2,
   Zap,
 } from "lucide-solid";
 
@@ -56,6 +57,8 @@ import Composer from "../components/session/composer";
 import type { SidebarSectionState } from "../components/session/sidebar";
 import FlyoutItem from "../components/flyout-item";
 import QuestionModal from "../components/question-modal";
+
+import { t, currentLocale } from "../../i18n";
 
 export type SessionViewProps = {
   selectedSessionId: string | null;
@@ -171,6 +174,9 @@ export type SessionViewProps = {
 };
 
 export default function SessionView(props: SessionViewProps) {
+  // Helper for translations
+  const tr = (key: string) => t(key, currentLocale());
+
   let messagesEndEl: HTMLDivElement | undefined;
   let chatContainerEl: HTMLDivElement | undefined;
   let agentPickerRef: HTMLDivElement | undefined;
@@ -192,15 +198,15 @@ export default function SessionView(props: SessionViewProps) {
   // navigation-only. Avoid showing any tab as "selected" to reduce confusion.
   const showRightSidebarSelection = createMemo(() => !props.selectedSessionId);
 
-  const agentLabel = createMemo(() => props.selectedSessionAgent ?? "Default agent");
+  const agentLabel = createMemo(() => props.selectedSessionAgent ?? tr("session.default_agent"));
   const workspaceLabel = (workspace: WorkspaceInfo) =>
     workspace.displayName?.trim() ||
     workspace.openworkWorkspaceName?.trim() ||
     workspace.name?.trim() ||
     workspace.path?.trim() ||
-    "Workspace";
+    tr("session.workspace");
   const workspaceKindLabel = (workspace: WorkspaceInfo) =>
-    workspace.workspaceType === "remote" ? "Remote" : "Local";
+    workspace.workspaceType === "remote" ? tr("session.remote") : tr("session.local");
   const todoList = createMemo(() => props.todos.filter((todo) => todo.content.trim()));
   const todoCount = createMemo(() => todoList().length);
   const todoCompletedCount = createMemo(() =>
@@ -209,7 +215,9 @@ export default function SessionView(props: SessionViewProps) {
   const todoLabel = createMemo(() => {
     const total = todoCount();
     if (!total) return "";
-    return `${todoCompletedCount()} out of ${total} tasks completed`;
+    return tr("session.todo_progress")
+      .replace("{completed}", String(todoCompletedCount()))
+      .replace("{total}", String(total));
   });
   const MAX_SESSIONS_PREVIEW = 3;
   const COLLAPSED_SESSIONS_PREVIEW = 1;
@@ -272,7 +280,9 @@ export default function SessionView(props: SessionViewProps) {
   const showMoreLabel = (workspaceId: string, total: number) => {
     const remaining = Math.max(0, total - previewCount(workspaceId));
     const nextCount = Math.min(MAX_SESSIONS_PREVIEW, remaining);
-    return nextCount > 0 ? `Show ${nextCount} more` : "Show more";
+    return nextCount > 0
+      ? tr("session.show_more_count").replace("{count}", String(nextCount))
+      : tr("session.show_more");
   };
   const [workspaceMenuId, setWorkspaceMenuId] = createSignal<string | null>(null);
   let workspaceMenuRef: HTMLDivElement | undefined;
@@ -297,9 +307,9 @@ export default function SessionView(props: SessionViewProps) {
   const attachmentsDisabledReason = createMemo(() => {
     if (attachmentsEnabled()) return null;
     if (props.openworkServerStatus === "limited") {
-      return "Add a server token to attach files.";
+      return tr("session.attach_files_token");
     }
-    return "Connect to OpenWork server to attach files.";
+    return tr("session.attach_files_connect");
   });
 
   createEffect(() => {
@@ -341,12 +351,12 @@ export default function SessionView(props: SessionViewProps) {
     if (!trimmed) return;
 
     if (props.activeWorkspaceDisplay.workspaceType === "remote") {
-      setToastMessage("File open is unavailable for remote workspaces.");
+      setToastMessage(tr("session.file_open_remote_unavailable"));
       return;
     }
 
     if (!isTauriRuntime()) {
-      setToastMessage("File open is available in the desktop app.");
+      setToastMessage(tr("session.file_open_desktop_only"));
       return;
     }
 
@@ -354,13 +364,13 @@ export default function SessionView(props: SessionViewProps) {
       const { openPath } = await import("@tauri-apps/plugin-opener");
       const root = props.activeWorkspaceRoot.trim();
       if (!isAbsolutePath(trimmed) && !root) {
-        setToastMessage("Pick a workspace to open files.");
+        setToastMessage(tr("session.pick_workspace_to_open"));
         return;
       }
       const target = !isAbsolutePath(trimmed) && root ? await join(root, trimmed) : trimmed;
       await openPath(target);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to open file";
+      const message = error instanceof Error ? error.message : tr("session.open_failed");
       setToastMessage(message);
     }
   };
@@ -377,7 +387,7 @@ export default function SessionView(props: SessionViewProps) {
       setAgentPickerReady(true);
       return sorted;
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to load agents";
+      const message = error instanceof Error ? error.message : tr("session.failed_to_load_agents");
       setAgentPickerError(message);
       setAgentOptions([]);
       return [];
@@ -481,35 +491,35 @@ export default function SessionView(props: SessionViewProps) {
       const tool = typeof record.tool === "string" ? record.tool : "";
       switch (tool) {
         case "task":
-          return "Delegating";
+          return tr("session.thinking_status.delegating");
         case "todowrite":
         case "todoread":
-          return "Planning";
+          return tr("session.thinking_status.planning");
         case "read":
-          return "Gathering context";
+          return tr("session.thinking_status.gathering_context");
         case "list":
         case "grep":
         case "glob":
-          return "Searching codebase";
+          return tr("session.thinking_status.searching_codebase");
         case "webfetch":
-          return "Searching the web";
+          return tr("session.thinking_status.searching_web");
         case "edit":
         case "write":
-          return "Making edits";
+          return tr("session.thinking_status.making_edits");
         case "bash":
-          return "Running shell";
+          return tr("session.thinking_status.running_shell");
         default:
-          return "Working";
+          return tr("session.thinking_status.working");
       }
     }
     if (part.type === "reasoning") {
       const text = typeof (part as any).text === "string" ? (part as any).text : "";
       const match = text.trimStart().match(/^\*\*(.+?)\*\*/);
-      if (match) return `Thinking about ${match[1].trim()}`;
-      return "Thinking";
+      if (match) return tr("session.thinking_status.thinking") + " " + match[1].trim();
+      return tr("session.thinking_status.thinking");
     }
     if (part.type === "text") {
-      return "Gathering thoughts";
+      return tr("session.thinking_status.gathering_thoughts");
     }
     return null;
   };
@@ -524,7 +534,7 @@ export default function SessionView(props: SessionViewProps) {
   const thinkingStatus = createMemo(() => {
     const status = computeStatusFromPart(latestRunPart());
     if (status) return status;
-    if (runPhase() === "thinking") return "Thinking";
+    if (runPhase() === "thinking") return tr("session.thinking_status.thinking");
     return null;
   });
 
@@ -543,12 +553,12 @@ export default function SessionView(props: SessionViewProps) {
     if (part.type === "reasoning") {
       const text = typeof (part as any).text === "string" ? (part as any).text : "";
       const detail = truncateDetail(text);
-      return detail ? { title: "Reasoning", detail } : { title: "Reasoning" };
+      return detail ? { title: tr("session.reasoning"), detail } : { title: tr("session.reasoning") };
     }
     if (part.type === "text") {
       const text = typeof (part as any).text === "string" ? (part as any).text : "";
       const detail = truncateDetail(text);
-      return detail ? { title: "Draft", detail } : { title: "Draft" };
+      return detail ? { title: tr("session.draft"), detail } : { title: tr("session.draft") };
     }
     return null;
   });
@@ -556,15 +566,15 @@ export default function SessionView(props: SessionViewProps) {
   const runLabel = createMemo(() => {
     switch (runPhase()) {
       case "sending":
-        return "Sending";
+        return tr("session.run_status.sending");
       case "retrying":
-        return "Retrying";
+        return tr("session.run_status.retrying");
       case "responding":
-        return "Responding";
+        return tr("session.run_status.responding");
       case "thinking":
-        return "Thinking";
+        return tr("session.run_status.thinking");
       case "error":
-        return "Run failed";
+        return tr("session.run_status.failed");
       default:
         return "";
     }
@@ -795,10 +805,10 @@ export default function SessionView(props: SessionViewProps) {
     setProviderAuthActionBusy(true);
     try {
       const message = await props.startProviderAuth(providerId);
-      setToastMessage(message || "Auth flow started");
+      setToastMessage(message || tr("providers.auth_started"));
       props.closeProviderAuthModal();
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Auth failed";
+      const message = error instanceof Error ? error.message : tr("providers.auth_failed");
       setToastMessage(message);
     } finally {
       setProviderAuthActionBusy(false);
@@ -810,10 +820,10 @@ export default function SessionView(props: SessionViewProps) {
     setProviderAuthActionBusy(true);
     try {
       const message = await props.submitProviderApiKey(providerId, apiKey);
-      setToastMessage(message || "API key saved");
+      setToastMessage(message || tr("providers.api_key_saved"));
       props.closeProviderAuthModal();
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to save API key";
+      const message = error instanceof Error ? error.message : tr("providers.api_key_failed");
       setToastMessage(message);
     } finally {
       setProviderAuthActionBusy(false);
@@ -906,23 +916,23 @@ export default function SessionView(props: SessionViewProps) {
       const token = props.openworkServerHostInfo?.clientToken?.trim() || "";
       return [
         {
-          label: "OpenWork workspace URL",
+          label: tr("session.share.workspace_url"),
           value: url,
-          placeholder: !isTauriRuntime() ? "Desktop app required" : "Starting server...",
+          placeholder: !isTauriRuntime() ? tr("session.share.desktop_required") : tr("session.share.starting_server"),
           hint: mountedUrl
-            ? "Use on phones or laptops connecting to this workspace."
+            ? tr("session.share.phone_hint")
             : hostUrl
-              ? "Workspace URL is resolving; host URL shown as fallback."
+              ? tr("session.share.fallback_hint")
               : undefined,
         },
         {
-          label: "Access token",
+          label: tr("session.share.access_token"),
           value: token,
           secret: true,
-          placeholder: isTauriRuntime() ? "-" : "Desktop app required",
+          placeholder: isTauriRuntime() ? "-" : tr("session.share.desktop_required"),
           hint: mountedUrl
-            ? "Use on phones or laptops connecting to this workspace."
-            : "Use on phones or laptops connecting to this host.",
+            ? tr("session.share.phone_hint")
+            : tr("session.share.host_hint"),
         },
       ];
     }
@@ -936,15 +946,15 @@ export default function SessionView(props: SessionViewProps) {
         "";
       return [
         {
-          label: "OpenWork workspace URL",
+          label: tr("session.share.workspace_url"),
           value: url,
         },
         {
-          label: "Access token",
+          label: tr("session.share.access_token"),
           value: token,
           secret: true,
-          placeholder: token ? undefined : "Set token in Config",
-          hint: "This token grants access to the workspace on that host.",
+          placeholder: token ? undefined : tr("session.share.set_token_hint"),
+          hint: tr("session.share.token_grant_hint"),
         },
       ];
     }
@@ -953,13 +963,13 @@ export default function SessionView(props: SessionViewProps) {
     const directory = ws.directory?.trim() || "";
     return [
       {
-        label: "OpenCode base URL",
+        label: tr("session.share.opencode_url"),
         value: baseUrl,
       },
       {
-        label: "Directory",
+        label: tr("session.share.directory"),
         value: directory,
-        placeholder: "(auto)",
+        placeholder: tr("session.share.auto"),
       },
     ];
   });
@@ -968,17 +978,17 @@ export default function SessionView(props: SessionViewProps) {
     const ws = shareWorkspace();
     if (!ws) return null;
     if (ws.workspaceType === "local" && props.engineInfo?.runtime === "direct") {
-      return "Engine runtime is set to Direct. Switching local workspaces can restart the host and disconnect clients. The token may change after a restart.";
+      return tr("session.share.direct_runtime_note");
     }
     return null;
   });
 
   const exportDisabledReason = createMemo(() => {
     const ws = shareWorkspace();
-    if (!ws) return "Export is available for local workspaces in the desktop app.";
-    if (ws.workspaceType === "remote") return "Export is only supported for local workspaces.";
-    if (!isTauriRuntime()) return "Export is available in the desktop app.";
-    if (props.exportWorkspaceBusy) return "Export is already running.";
+    if (!ws) return tr("session.export.local_only_hint");
+    if (ws.workspaceType === "remote") return tr("session.export.remote_unsupported");
+    if (!isTauriRuntime()) return tr("session.export.desktop_only");
+    if (props.exportWorkspaceBusy) return tr("session.export.busy");
     return null;
   });
 
@@ -1043,10 +1053,10 @@ export default function SessionView(props: SessionViewProps) {
   const updatePillLabel = createMemo(() => {
     const state = props.updateStatus?.state;
     if (state === "ready") {
-      return props.anyActiveRuns ? "Update ready" : "Restart";
+      return props.anyActiveRuns ? tr("settings.update_ready") : tr("settings.restart");
     }
-    if (state === "downloading") return "Downloading";
-    return "Update";
+    if (state === "downloading") return tr("settings.downloading");
+    return tr("settings.update");
   });
 
   const updatePillTitle = createMemo(() => {
@@ -1054,11 +1064,11 @@ export default function SessionView(props: SessionViewProps) {
     const state = props.updateStatus?.state;
     if (state === "ready") {
       return props.anyActiveRuns
-        ? `Update ready ${version}. Stop active runs to restart.`
-        : `Restart to apply update ${version}`;
+        ? `${tr("settings.update_ready")} ${version}. ${tr("settings.stop_runs_to_restart")}`
+        : `${tr("settings.restart_to_apply")} ${version}`;
     }
-    if (state === "downloading") return `Downloading update ${version}`;
-    return `Update available ${version}`;
+    if (state === "downloading") return `${tr("settings.downloading_update")} ${version}`;
+    return `${tr("settings.update_available")} ${version}`;
   });
 
   const handleUpdatePillClick = () => {
@@ -1098,9 +1108,8 @@ export default function SessionView(props: SessionViewProps) {
                 when={props.updateStatus?.state === "downloading"}
                 fallback={
                   <span
-                    class={`w-2 h-2 rounded-full ${
-                      props.updateStatus?.state === "ready" ? "bg-green-9" : "bg-amber-9"
-                    }`}
+                    class={`w-2 h-2 rounded-full ${props.updateStatus?.state === "ready" ? "bg-green-9" : "bg-amber-9"
+                      }`}
                   />
                 }
               >
@@ -1115,7 +1124,7 @@ export default function SessionView(props: SessionViewProps) {
             </button>
           </Show>
           <div class="flex items-center text-[11px] font-bold text-dls-secondary uppercase px-3 mb-3 pt-2 tracking-tight">
-            <span>Tasks</span>
+            <span>{tr("session.sidebar.tasks")}</span>
           </div>
 
           <div class="space-y-3 mb-3">
@@ -1128,63 +1137,63 @@ export default function SessionView(props: SessionViewProps) {
                 return (
                   <div class="space-y-1">
                     <div class="relative group">
-                        <div
-                          role="button"
-                          tabIndex={0}
-                          class="w-full flex items-center justify-between h-10 px-3 rounded-lg text-left transition-colors text-dls-text hover:bg-dls-hover"
-                          onClick={() => {
-                            expandWorkspace(workspace().id);
-                            props.activateWorkspace(workspace().id);
-                          }}
-                          onKeyDown={(event) => {
-                            if (event.key !== "Enter" && event.key !== " ") return;
-                            event.preventDefault();
-                            expandWorkspace(workspace().id);
-                            props.activateWorkspace(workspace().id);
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        class="w-full flex items-center justify-between h-10 px-3 rounded-lg text-left transition-colors text-dls-text hover:bg-dls-hover"
+                        onClick={() => {
+                          expandWorkspace(workspace().id);
+                          props.activateWorkspace(workspace().id);
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key !== "Enter" && event.key !== " ") return;
+                          event.preventDefault();
+                          expandWorkspace(workspace().id);
+                          props.activateWorkspace(workspace().id);
+                        }}
+                      >
+                        <button
+                          type="button"
+                          class="mr-2 -ml-1 p-1 rounded-md text-dls-secondary hover:text-dls-text hover:bg-dls-active"
+                          aria-label={isWorkspaceExpanded(workspace().id) ? tr("session.sidebar.collapse") : tr("session.sidebar.expand")}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            toggleWorkspaceExpanded(workspace().id);
                           }}
                         >
-                          <button
-                            type="button"
-                            class="mr-2 -ml-1 p-1 rounded-md text-dls-secondary hover:text-dls-text hover:bg-dls-active"
-                            aria-label={isWorkspaceExpanded(workspace().id) ? "Collapse" : "Expand"}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              toggleWorkspaceExpanded(workspace().id);
-                            }}
+                          <Show
+                            when={isWorkspaceExpanded(workspace().id)}
+                            fallback={<ChevronRight size={14} />}
                           >
-                            <Show
-                              when={isWorkspaceExpanded(workspace().id)}
-                              fallback={<ChevronRight size={14} />}
-                            >
-                              <ChevronDown size={14} />
-                            </Show>
-                          </button>
-                          <div class="min-w-0 flex-1">
-                            <div class="text-sm font-medium truncate">{workspaceLabel(workspace())}</div>
-                            <div class="text-[11px] text-dls-secondary">
-                              {workspaceKindLabel(workspace())}
-                            </div>
+                            <ChevronDown size={14} />
+                          </Show>
+                        </button>
+                        <div class="min-w-0 flex-1">
+                          <div class="text-sm font-medium truncate">{workspaceLabel(workspace())}</div>
+                          <div class="text-[11px] text-dls-secondary">
+                            {workspaceKindLabel(workspace())}
                           </div>
-                          <Show when={group.status === "loading"}>
-                            <Loader2 size={14} class="animate-spin text-dls-secondary mr-1" />
-                          </Show>
-                          <Show when={group.status === "error"}>
-                            <span
-                              class="text-[10px] px-2 py-0.5 rounded-full border border-red-7/50 text-red-11 bg-red-3/30"
-                              title={group.error ?? "Failed to load tasks"}
-                            >
-                              Error
-                            </span>
-                          </Show>
-                          <Show when={group.status === "ready" && group.sessions.length > 0}>
-                            <span class="text-[10px] px-2 py-0.5 rounded-full border border-dls-border text-dls-secondary bg-dls-hover">
-                              {group.sessions.length}
-                            </span>
-                          </Show>
-                          <Show when={isConnecting()}>
-                            <Loader2 size={14} class="animate-spin text-dls-secondary" />
-                          </Show>
                         </div>
+                        <Show when={group.status === "loading"}>
+                          <Loader2 size={14} class="animate-spin text-dls-secondary mr-1" />
+                        </Show>
+                        <Show when={group.status === "error"}>
+                          <span
+                            class="text-[10px] px-2 py-0.5 rounded-full border border-red-7/50 text-red-11 bg-red-3/30"
+                            title={group.error ?? tr("session.sidebar.failed_to_load")}
+                          >
+                            {tr("session.sidebar.error")}
+                          </span>
+                        </Show>
+                        <Show when={group.status === "ready" && group.sessions.length > 0}>
+                          <span class="text-[10px] px-2 py-0.5 rounded-full border border-dls-border text-dls-secondary bg-dls-hover">
+                            {group.sessions.length}
+                          </span>
+                        </Show>
+                        <Show when={isConnecting()}>
+                          <Loader2 size={14} class="animate-spin text-dls-secondary" />
+                        </Show>
+                      </div>
                       <div class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
                           type="button"
@@ -1194,7 +1203,7 @@ export default function SessionView(props: SessionViewProps) {
                             createTaskInWorkspace(workspace().id);
                           }}
                           disabled={props.newTaskDisabled}
-                          aria-label="New task"
+                          aria-label={tr("session.sidebar.new_task")}
                         >
                           <Plus size={14} />
                         </button>
@@ -1207,7 +1216,7 @@ export default function SessionView(props: SessionViewProps) {
                               current === workspace().id ? null : workspace().id
                             );
                           }}
-                          aria-label="Workspace options"
+                          aria-label={tr("session.sidebar.workspace_options")}
                         >
                           <MoreHorizontal size={14} />
                         </button>
@@ -1226,7 +1235,7 @@ export default function SessionView(props: SessionViewProps) {
                               setWorkspaceMenuId(null);
                             }}
                           >
-                            Edit name
+                            {tr("session.sidebar.edit_name")}
                           </button>
                           <button
                             type="button"
@@ -1236,7 +1245,7 @@ export default function SessionView(props: SessionViewProps) {
                               setWorkspaceMenuId(null);
                             }}
                           >
-                            Share...
+                            {tr("session.sidebar.share")}
                           </button>
                           <Show when={workspace().workspaceType === "remote"}>
                             <button
@@ -1247,7 +1256,7 @@ export default function SessionView(props: SessionViewProps) {
                                 setWorkspaceMenuId(null);
                               }}
                             >
-                              Edit connection
+                              {tr("session.sidebar.edit_connection")}
                             </button>
                           </Show>
                           <button
@@ -1258,7 +1267,7 @@ export default function SessionView(props: SessionViewProps) {
                               setWorkspaceMenuId(null);
                             }}
                           >
-                            Remove workspace
+                            {tr("session.sidebar.remove_workspace")}
                           </button>
                         </div>
                       </Show>
@@ -1276,11 +1285,10 @@ export default function SessionView(props: SessionViewProps) {
                                   <div
                                     role="button"
                                     tabIndex={0}
-                                    class={`group flex items-center justify-between h-8 px-3 rounded-lg cursor-pointer relative overflow-hidden ml-2 w-[calc(100%-0.5rem)] ${
-                                      isSelected()
-                                        ? "bg-dls-active text-dls-text"
-                                        : "hover:bg-dls-hover"
-                                    }`}
+                                    class={`group flex items-center justify-between h-8 px-3 rounded-lg cursor-pointer relative ml-2 w-[calc(100%-0.5rem)] ${isSelected()
+                                      ? "bg-dls-active text-dls-text"
+                                      : "hover:bg-dls-hover"
+                                      }`}
                                     onClick={() => openSessionFromList(workspace().id, session.id)}
                                     onKeyDown={(event) => {
                                       if (event.key !== "Enter" && event.key !== " ") return;
@@ -1288,14 +1296,29 @@ export default function SessionView(props: SessionViewProps) {
                                       openSessionFromList(workspace().id, session.id);
                                     }}
                                   >
-                                    <span class="text-sm text-dls-text truncate mr-2 font-medium">
+                                    <span class="text-sm truncate mr-10 font-medium flex-1">
                                       {session.title}
                                     </span>
-                                    <Show when={session.time?.updated}>
-                                      <span class="text-xs text-dls-secondary whitespace-nowrap">
-                                        {formatRelativeTime(session.time?.updated ?? Date.now())}
-                                      </span>
-                                    </Show>
+                                    <div class="flex items-center shrink-0">
+                                      <Show when={session.time?.updated}>
+                                        <span class="text-xs text-dls-secondary whitespace-nowrap group-hover:invisible">
+                                          {formatRelativeTime(session.time?.updated ?? Date.now())}
+                                        </span>
+                                      </Show>
+                                      <button
+                                        type="button"
+                                        class="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 flex items-center justify-center w-6 h-6 rounded-md text-dls-secondary hover:text-red-11 hover:bg-red-3/40 transition-all z-20"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          if (confirm(tr("dashboard.session.delete_confirm"))) {
+                                            void props.deleteSession(session.id);
+                                          }
+                                        }}
+                                        title={tr("dashboard.session.delete")}
+                                      >
+                                        <Trash2 size={14} />
+                                      </button>
+                                    </div>
                                   </div>
                                 );
                               }}
@@ -1312,9 +1335,9 @@ export default function SessionView(props: SessionViewProps) {
                                 <Show when={group.status === "error"}>
                                   <div
                                     class="w-full px-3 py-2 text-xs text-red-11 ml-2 text-left rounded-lg bg-red-3/20 border border-red-7/40"
-                                    title={group.error ?? "Failed to load tasks"}
+                                    title={group.error ?? tr("session.sidebar.failed_to_load")}
                                   >
-                                    Failed to load tasks
+                                    {tr("session.sidebar.failed_to_load")}
                                   </div>
                                 </Show>
                               }
@@ -1326,11 +1349,10 @@ export default function SessionView(props: SessionViewProps) {
                                     <div
                                       role="button"
                                       tabIndex={0}
-                                      class={`group flex items-center justify-between h-8 px-3 rounded-lg cursor-pointer relative overflow-hidden ml-2 w-[calc(100%-0.5rem)] ${
-                                        isSelected()
-                                          ? "bg-dls-active text-dls-text"
-                                          : "hover:bg-dls-hover"
-                                      }`}
+                                      class={`group flex items-center justify-between h-8 px-3 rounded-lg cursor-pointer relative ml-2 w-[calc(100%-0.5rem)] ${isSelected()
+                                        ? "bg-dls-active text-dls-text"
+                                        : "hover:bg-dls-hover"
+                                        }`}
                                       onClick={() => openSessionFromList(workspace().id, session.id)}
                                       onKeyDown={(event) => {
                                         if (event.key !== "Enter" && event.key !== " ") return;
@@ -1338,14 +1360,29 @@ export default function SessionView(props: SessionViewProps) {
                                         openSessionFromList(workspace().id, session.id);
                                       }}
                                     >
-                                      <span class="text-sm text-dls-text truncate mr-2 font-medium">
+                                      <span class="text-sm truncate mr-10 font-medium flex-1">
                                         {session.title}
                                       </span>
-                                      <Show when={session.time?.updated}>
-                                        <span class="text-xs text-dls-secondary whitespace-nowrap">
-                                          {formatRelativeTime(session.time?.updated ?? Date.now())}
-                                        </span>
-                                      </Show>
+                                      <div class="flex items-center shrink-0">
+                                        <Show when={session.time?.updated}>
+                                          <span class="text-xs text-dls-secondary whitespace-nowrap group-hover:invisible">
+                                            {formatRelativeTime(session.time?.updated ?? Date.now())}
+                                          </span>
+                                        </Show>
+                                        <button
+                                          type="button"
+                                          class="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 flex items-center justify-center w-6 h-6 rounded-md text-dls-secondary hover:text-red-11 hover:bg-red-3/40 transition-all z-20"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (confirm(tr("dashboard.session.delete_confirm"))) {
+                                              void props.deleteSession(session.id);
+                                            }
+                                          }}
+                                          title={tr("dashboard.session.delete")}
+                                        >
+                                          <Trash2 size={14} />
+                                        </button>
+                                      </div>
                                     </div>
                                   );
                                 }}
@@ -1358,8 +1395,8 @@ export default function SessionView(props: SessionViewProps) {
                                   onClick={() => createTaskInWorkspace(workspace().id)}
                                   disabled={props.newTaskDisabled}
                                 >
-                                  <span class="group-hover/empty:hidden">No tasks yet.</span>
-                                  <span class="hidden group-hover/empty:inline font-medium">+ New task</span>
+                                  <span class="group-hover/empty:hidden">{tr("session.sidebar.no_tasks")}</span>
+                                  <span class="hidden group-hover/empty:inline font-medium">+ {tr("session.sidebar.new_task")}</span>
                                 </button>
                               </Show>
 
@@ -1376,7 +1413,7 @@ export default function SessionView(props: SessionViewProps) {
                           }
                         >
                           <div class="w-full px-3 py-2 text-xs text-dls-secondary ml-2 text-left rounded-lg">
-                            Loading tasks...
+                            {tr("session.sidebar.loading_tasks")}
                           </div>
                         </Show>
                       </Show>
@@ -1394,7 +1431,7 @@ export default function SessionView(props: SessionViewProps) {
               onClick={() => setAddWorkspaceMenuOpen((prev) => !prev)}
             >
               <Plus size={14} />
-              Add a workspace
+              {tr("session.sidebar.add_workspace")}
             </button>
             <Show when={addWorkspaceMenuOpen()}>
               <div class="absolute left-0 right-0 top-full mt-2 rounded-lg border border-dls-border bg-dls-surface shadow-xl overflow-hidden z-20">
@@ -1407,7 +1444,7 @@ export default function SessionView(props: SessionViewProps) {
                   }}
                 >
                   <Plus size={12} />
-                  New workspace
+                  {tr("dashboard.new_workspace")}
                 </button>
                 <button
                   type="button"
@@ -1418,7 +1455,7 @@ export default function SessionView(props: SessionViewProps) {
                   }}
                 >
                   <Plus size={12} />
-                  Connect remote
+                  {tr("dashboard.new_remote_workspace")}
                 </button>
                 <button
                   type="button"
@@ -1430,7 +1467,7 @@ export default function SessionView(props: SessionViewProps) {
                   }}
                 >
                   <Plus size={12} />
-                  Import config
+                  {tr("session.sidebar.import_config")}
                 </button>
               </div>
             </Show>
@@ -1444,7 +1481,7 @@ export default function SessionView(props: SessionViewProps) {
             class="flex items-center gap-3 px-3 py-2 rounded-lg text-dls-secondary hover:bg-dls-hover transition-colors"
           >
             <Settings size={18} />
-            <span class="text-sm font-medium">Settings</span>
+            <span class="text-sm font-medium">{tr("session.sidebar.settings")}</span>
           </button>
         </div>
       </aside>
@@ -1464,9 +1501,8 @@ export default function SessionView(props: SessionViewProps) {
                   when={props.updateStatus?.state === "downloading"}
                   fallback={
                     <span
-                      class={`w-2 h-2 rounded-full ${
-                        props.updateStatus?.state === "ready" ? "bg-green-9" : "bg-amber-9"
-                      }`}
+                      class={`w-2 h-2 rounded-full ${props.updateStatus?.state === "ready" ? "bg-green-9" : "bg-amber-9"
+                        }`}
                     />
                   }
                 >
@@ -1481,7 +1517,7 @@ export default function SessionView(props: SessionViewProps) {
               </button>
             </Show>
             <h1 class="text-sm font-semibold text-dls-text">
-              {selectedSessionTitle() || "New task"}
+              {selectedSessionTitle() || tr("session.sidebar.new_task")}
             </h1>
             <Show when={props.developerMode}>
               <span class="text-xs text-dls-secondary">{props.headerStatus}</span>
@@ -1492,251 +1528,249 @@ export default function SessionView(props: SessionViewProps) {
           </div>
         </header>
 
-      <Show when={props.error}>
-        <div class="mx-auto max-w-5xl w-full px-6 md:px-10 pt-4">
-          <div class="rounded-2xl bg-red-1/40 px-5 py-4 text-sm text-red-12 border border-red-7/20">
-            {props.error}
-          </div>
-        </div>
-      </Show>
-
-      <div class="flex-1 flex overflow-hidden relative">
-        <div
-          class="flex-1 overflow-y-auto px-12 py-10 scroll-smooth bg-dls-surface"
-          ref={(el) => (chatContainerEl = el)}
-        >
-          <div class="max-w-5xl mx-auto w-full">
-          <Show when={props.messages.length === 0}>
-            <div class="text-center py-16 px-6 space-y-6">
-              <div class="w-16 h-16 bg-dls-hover rounded-3xl mx-auto flex items-center justify-center border border-dls-border">
-                <Zap class="text-dls-secondary" />
-              </div>
-              <div class="space-y-2">
-                <h3 class="text-xl font-medium">What do you want to do?</h3>
-                <p class="text-dls-secondary text-sm max-w-sm mx-auto">
-                  Pick a starting point or just type below.
-                </p>
-              </div>
-              <div class="flex justify-center">
-                <button
-                  type="button"
-                  class="px-4 py-2.5 rounded-xl border border-gray-6 bg-gray-2 text-sm text-gray-12 hover:bg-gray-3 hover:border-gray-7 transition-all"
-                  onClick={() => {
-                    handleSendPrompt({
-                      mode: "prompt",
-                      text: "Help me set up browser automation.",
-                      parts: [{ type: "text", text: "Help me set up browser automation." }],
-                      attachments: [],
-                    });
-                  }}
-                >
-                  Automate your browser
-                </button>
-              </div>
+        <Show when={props.error}>
+          <div class="mx-auto max-w-5xl w-full px-6 md:px-10 pt-4">
+            <div class="rounded-2xl bg-red-1/40 px-5 py-4 text-sm text-red-12 border border-red-7/20">
+              {props.error}
             </div>
-          </Show>
-
-          <MessageList
-            messages={props.messages}
-            developerMode={props.developerMode}
-            showThinking={props.showThinking}
-            expandedStepIds={props.expandedStepIds}
-            setExpandedStepIds={props.setExpandedStepIds}
-            footer={
-              showRunIndicator() ? (
-                <div class="flex justify-start pl-2">
-                  <div class="w-full max-w-[68ch] space-y-2">
-                    <Show when={thinkingStatus()}>
-                      <div class="rounded-xl border border-gray-6/70 bg-gray-2/40 px-3 py-2 text-xs text-gray-11">
-                        <button
-                          type="button"
-                          class="w-full flex items-center justify-between gap-3 text-left"
-                          onClick={() => setThinkingExpanded((prev) => !prev)}
-                          aria-expanded={thinkingExpanded()}
-                        >
-                          <div class="flex items-center gap-2 min-w-0">
-                            <span class="text-[10px] uppercase tracking-wide text-gray-9">Thinking</span>
-                            <span class="truncate text-gray-12">{thinkingStatus()}</span>
-                          </div>
-                          <ChevronDown
-                            size={12}
-                            class={`text-gray-8 transition-transform ${thinkingExpanded() ? "rotate-180" : ""}`}
-                          />
-                        </button>
-                        <Show when={thinkingExpanded() && thinkingDetail()}>
-                          {(detail) => (
-                            <div class="mt-2 text-xs text-gray-11">
-                              <div class="text-gray-12">{detail().title}</div>
-                              <Show when={detail().detail}>
-                                <div class="mt-1 whitespace-pre-wrap text-gray-10">{detail().detail}</div>
-                              </Show>
-                            </div>
-                          )}
-                        </Show>
-                      </div>
-                    </Show>
-                    <div
-                      class={`w-full flex items-center justify-between gap-3 text-xs ${runPhase() === "error" ? "text-red-11" : "text-gray-9"
-                        }`}
-                      role="status"
-                      aria-live="polite"
-                    >
-                      <div class="flex items-center gap-2 min-w-0">
-                        <Show
-                          when={runPhase() === "responding"}
-                          fallback={
-                            <span
-                              class={`h-1.5 w-1.5 rounded-full ${runPhase() === "error" ? "bg-red-9/80" : "bg-gray-8/80"
-                                }`}
-                            />
-                          }
-                        >
-                          <span class="flex items-center gap-1">
-                            <span
-                              class={`h-1.5 w-1.5 rounded-full animate-pulse ${runPhase() === "error" ? "bg-red-9/80" : "bg-gray-8/80"
-                                }`}
-                            />
-                            <span
-                              class={`h-1.5 w-1.5 rounded-full animate-pulse ${runPhase() === "error" ? "bg-red-9/60" : "bg-gray-8/60"
-                                }`}
-                              style={{ "animation-delay": "120ms" }}
-                            />
-                            <span
-                              class={`h-1.5 w-1.5 rounded-full animate-pulse ${runPhase() === "error" ? "bg-red-9/40" : "bg-gray-8/40"
-                                }`}
-                              style={{ "animation-delay": "240ms" }}
-                            />
-                          </span>
-                        </Show>
-                        <span class="truncate">{runLabel()}</span>
-                      </div>
-                      <Show when={props.developerMode}>
-                        <span class="shrink-0 text-[10px] text-gray-8">{runElapsedLabel()}</span>
-                      </Show>
-                    </div>
-                  </div>
-                </div>
-              ) : undefined
-            }
-          />
-
-          <div ref={(el) => (messagesEndEl = el)} />
-          </div>
-        </div>
-
-        <Show when={!autoScrollEnabled() && props.messages.length > 0}>
-          <div class="absolute bottom-4 left-0 right-0 z-20 flex justify-center pointer-events-none">
-            <button
-              type="button"
-              class="pointer-events-auto rounded-full border border-gray-6 bg-gray-1/90 px-4 py-2 text-xs text-gray-11 shadow-lg shadow-gray-12/5 backdrop-blur-md hover:bg-gray-2 transition-colors"
-              onClick={() => scrollToLatest("smooth")}
-            >
-              Jump to latest
-            </button>
           </div>
         </Show>
-      </div>
 
-      <Show when={todoCount() > 0}>
-        <div class="mx-auto w-full max-w-[68ch] px-4">
-          <div class="rounded-t-xl border border-b-0 border-gray-6/70 bg-gray-1/70 shadow-sm shadow-gray-12/5">
-            <button
-              type="button"
-              class="w-full flex items-center justify-between px-4 py-2.5 text-xs text-gray-9 hover:bg-gray-2/50 transition-colors rounded-t-xl"
-              onClick={() => setTodoExpanded((prev) => !prev)}
-            >
-              <div class="flex items-center gap-2">
-                <ListTodo size={14} class="text-gray-8" />
-                <span class="text-gray-11 font-medium">{todoLabel()}</span>
-              </div>
-              <Minimize2
-                size={12}
-                class={`text-gray-8 transition-transform ${todoExpanded() ? "" : "rotate-180"}`}
+        <div class="flex-1 flex overflow-hidden relative">
+          <div
+            class="flex-1 overflow-y-auto px-12 py-10 scroll-smooth bg-dls-surface"
+            ref={(el) => (chatContainerEl = el)}
+          >
+            <div class="max-w-5xl mx-auto w-full">
+              <Show when={props.messages.length === 0}>
+                <div class="text-center py-16 px-6 space-y-6">
+                  <div class="w-16 h-16 bg-dls-hover rounded-3xl mx-auto flex items-center justify-center border border-dls-border">
+                    <Zap class="text-dls-secondary" />
+                  </div>
+                  <div class="space-y-2">
+                    <h3 class="text-xl font-medium">{tr("session.splash.hero_title")}</h3>
+                    <p class="text-dls-secondary text-sm max-w-sm mx-auto">
+                      {tr("session.splash.hero_description")}
+                    </p>
+                  </div>
+                  <div class="flex justify-center">
+                    <button
+                      type="button"
+                      class="px-4 py-2.5 rounded-xl border border-gray-6 bg-gray-2 text-sm text-gray-12 hover:bg-gray-3 hover:border-gray-7 transition-all"
+                      onClick={() => {
+                        handleSendPrompt({
+                          mode: "prompt",
+                          text: "Help me set up browser automation.",
+                          parts: [{ type: "text", text: "Help me set up browser automation." }],
+                          attachments: [],
+                        });
+                      }}
+                    >
+                      {tr("session.splash.automate_browser")}
+                    </button>
+                  </div>
+                </div>
+              </Show>
+
+              <MessageList
+                messages={props.messages}
+                developerMode={props.developerMode}
+                showThinking={props.showThinking}
+                expandedStepIds={props.expandedStepIds}
+                setExpandedStepIds={props.setExpandedStepIds}
+                footer={
+                  showRunIndicator() ? (
+                    <div class="flex justify-start pl-2">
+                      <div class="w-full max-w-[68ch] space-y-2">
+                        <Show when={thinkingStatus()}>
+                          <div class="rounded-xl border border-gray-6/70 bg-gray-2/40 px-3 py-2 text-xs text-gray-11">
+                            <button
+                              type="button"
+                              class="w-full flex items-center justify-between gap-3 text-left"
+                              onClick={() => setThinkingExpanded((prev) => !prev)}
+                              aria-expanded={thinkingExpanded()}
+                            >
+                              <div class="flex items-center gap-2 min-w-0">
+                                <span class="text-[10px] uppercase tracking-wide text-gray-9">{tr("session.run_status.thinking")}</span>
+                                <span class="truncate text-gray-12">{thinkingStatus()}</span>
+                              </div>
+                              <ChevronDown
+                                size={12}
+                                class={`text-gray-8 transition-transform ${thinkingExpanded() ? "rotate-180" : ""}`}
+                              />
+                            </button>
+                            <Show when={thinkingExpanded() && thinkingDetail()}>
+                              {(detail) => (
+                                <div class="mt-2 text-xs text-gray-11">
+                                  <div class="text-gray-12">{detail().title}</div>
+                                  <Show when={detail().detail}>
+                                    <div class="mt-1 whitespace-pre-wrap text-gray-10">{detail().detail}</div>
+                                  </Show>
+                                </div>
+                              )}
+                            </Show>
+                          </div>
+                        </Show>
+                        <div
+                          class={`w-full flex items-center justify-between gap-3 text-xs ${runPhase() === "error" ? "text-red-11" : "text-gray-9"
+                            }`}
+                          role="status"
+                          aria-live="polite"
+                        >
+                          <div class="flex items-center gap-2 min-w-0">
+                            <Show
+                              when={runPhase() === "responding"}
+                              fallback={
+                                <span
+                                  class={`h-1.5 w-1.5 rounded-full ${runPhase() === "error" ? "bg-red-9/80" : "bg-gray-8/80"
+                                    }`}
+                                />
+                              }
+                            >
+                              <span class="flex items-center gap-1">
+                                <span
+                                  class={`h-1.5 w-1.5 rounded-full animate-pulse ${runPhase() === "error" ? "bg-red-9/80" : "bg-gray-8/80"
+                                    }`}
+                                />
+                                <span
+                                  class={`h-1.5 w-1.5 rounded-full animate-pulse ${runPhase() === "error" ? "bg-red-9/60" : "bg-gray-8/60"
+                                    }`}
+                                  style={{ "animation-delay": "120ms" }}
+                                />
+                                <span
+                                  class={`h-1.5 w-1.5 rounded-full animate-pulse ${runPhase() === "error" ? "bg-red-9/40" : "bg-gray-8/40"
+                                    }`}
+                                  style={{ "animation-delay": "240ms" }}
+                                />
+                              </span>
+                            </Show>
+                            <span class="truncate">{runLabel()}</span>
+                          </div>
+                          <Show when={props.developerMode}>
+                            <span class="shrink-0 text-[10px] text-gray-8">{runElapsedLabel()}</span>
+                          </Show>
+                        </div>
+                      </div>
+                    </div>
+                  ) : undefined
+                }
               />
-            </button>
-            <Show when={todoExpanded()}>
-              <div class="px-4 pb-3 space-y-2.5 max-h-60 overflow-auto border-t border-gray-6/50">
-                <For each={todoList()}>
-                  {(todo, index) => {
-                    const done = () => todo.status === "completed";
-                    const cancelled = () => todo.status === "cancelled";
-                    const active = () => todo.status === "in_progress";
-                    return (
-                      <div class="flex items-start gap-2.5 pt-2.5 first:pt-2.5">
-                        <div class="flex items-center gap-1.5 pt-0.5">
-                          <div
-                            class={`h-4.5 w-4.5 rounded-full border flex items-center justify-center ${
-                              done()
+
+              <div ref={(el) => (messagesEndEl = el)} />
+            </div>
+          </div>
+
+          <Show when={!autoScrollEnabled() && props.messages.length > 0}>
+            <div class="absolute bottom-4 left-0 right-0 z-20 flex justify-center pointer-events-none">
+              <button
+                type="button"
+                class="pointer-events-auto rounded-full border border-gray-6 bg-gray-1/90 px-4 py-2 text-xs text-gray-11 shadow-lg shadow-gray-12/5 backdrop-blur-md hover:bg-gray-2 transition-colors"
+                onClick={() => scrollToLatest("smooth")}
+              >
+                Jump to latest
+              </button>
+            </div>
+          </Show>
+        </div>
+
+        <Show when={todoCount() > 0}>
+          <div class="mx-auto w-full max-w-[68ch] px-4">
+            <div class="rounded-t-xl border border-b-0 border-gray-6/70 bg-gray-1/70 shadow-sm shadow-gray-12/5">
+              <button
+                type="button"
+                class="w-full flex items-center justify-between px-4 py-2.5 text-xs text-gray-9 hover:bg-gray-2/50 transition-colors rounded-t-xl"
+                onClick={() => setTodoExpanded((prev) => !prev)}
+              >
+                <div class="flex items-center gap-2">
+                  <ListTodo size={14} class="text-gray-8" />
+                  <span class="text-gray-11 font-medium">{todoLabel()}</span>
+                </div>
+                <Minimize2
+                  size={12}
+                  class={`text-gray-8 transition-transform ${todoExpanded() ? "" : "rotate-180"}`}
+                />
+              </button>
+              <Show when={todoExpanded()}>
+                <div class="px-4 pb-3 space-y-2.5 max-h-60 overflow-auto border-t border-gray-6/50">
+                  <For each={todoList()}>
+                    {(todo, index) => {
+                      const done = () => todo.status === "completed";
+                      const cancelled = () => todo.status === "cancelled";
+                      const active = () => todo.status === "in_progress";
+                      return (
+                        <div class="flex items-start gap-2.5 pt-2.5 first:pt-2.5">
+                          <div class="flex items-center gap-1.5 pt-0.5">
+                            <div
+                              class={`h-4.5 w-4.5 rounded-full border flex items-center justify-center ${done()
                                 ? "border-green-6 bg-green-2 text-green-11"
                                 : active()
                                   ? "border-amber-6 bg-amber-2 text-amber-11"
                                   : cancelled()
                                     ? "border-gray-6 bg-gray-2 text-gray-8"
                                     : "border-gray-6 bg-gray-1 text-gray-8"
-                            }`}
+                                }`}
+                            >
+                              <Show when={done()}>
+                                <Check size={10} />
+                              </Show>
+                              <Show when={!done() && active()}>
+                                <span class="h-1.5 w-1.5 rounded-full bg-amber-9" />
+                              </Show>
+                            </div>
+                          </div>
+                          <div
+                            class={`flex-1 text-sm leading-relaxed ${cancelled() ? "text-gray-9 line-through" : "text-gray-12"
+                              }`}
                           >
-                            <Show when={done()}>
-                              <Check size={10} />
-                            </Show>
-                            <Show when={!done() && active()}>
-                              <span class="h-1.5 w-1.5 rounded-full bg-amber-9" />
-                            </Show>
+                            <span class="text-gray-9 mr-1.5">{index() + 1}.</span>
+                            {todo.content}
                           </div>
                         </div>
-                        <div
-                          class={`flex-1 text-sm leading-relaxed ${
-                            cancelled() ? "text-gray-9 line-through" : "text-gray-12"
-                          }`}
-                        >
-                          <span class="text-gray-9 mr-1.5">{index() + 1}.</span>
-                          {todo.content}
-                        </div>
-                      </div>
-                    );
-                  }}
-                </For>
-              </div>
-            </Show>
+                      );
+                    }}
+                  </For>
+                </div>
+              </Show>
+            </div>
           </div>
-        </div>
-      </Show>
+        </Show>
 
-      <Composer
-        prompt={props.prompt}
-        busy={props.busy}
-        onSend={handleSendPrompt}
-        onDraftChange={handleDraftChange}
-        selectedModelLabel={props.selectedSessionModelLabel || "Model"}
-        onModelClick={props.openSessionModelPicker}
-        modelVariantLabel={props.modelVariantLabel}
-        modelVariant={props.modelVariant}
-        onModelVariantChange={props.setModelVariant}
-        agentLabel={agentLabel()}
-        selectedAgent={props.selectedSessionAgent}
-        agentPickerOpen={agentPickerOpen()}
-        agentPickerBusy={agentPickerBusy()}
-        agentPickerError={agentPickerError()}
-        agentOptions={agentOptions()}
-        onToggleAgentPicker={openAgentPicker}
-        onSelectAgent={(agent) => {
-          applySessionAgent(agent);
-          setAgentPickerOpen(false);
-        }}
-        setAgentPickerRef={(el) => {
-          agentPickerRef = el;
-        }}
-        showNotionBanner={props.showTryNotionPrompt}
-        onNotionBannerClick={props.onTryNotionPrompt}
-        toast={toastMessage()}
-        onToast={(message) => setToastMessage(message)}
-        listAgents={props.listAgents}
-        recentFiles={props.workingFiles}
-        searchFiles={props.searchFiles}
-        listCommands={props.listCommands}
-        isRemoteWorkspace={props.activeWorkspaceDisplay.workspaceType === "remote"}
-        attachmentsEnabled={attachmentsEnabled()}
-        attachmentsDisabledReason={attachmentsDisabledReason()}
-      />
+        <Composer
+          prompt={props.prompt}
+          busy={props.busy}
+          onSend={handleSendPrompt}
+          onDraftChange={handleDraftChange}
+          selectedModelLabel={props.selectedSessionModelLabel || tr("settings.model")}
+          onModelClick={props.openSessionModelPicker}
+          modelVariantLabel={props.modelVariantLabel}
+          modelVariant={props.modelVariant}
+          onModelVariantChange={props.setModelVariant}
+          agentLabel={agentLabel()}
+          selectedAgent={props.selectedSessionAgent}
+          agentPickerOpen={agentPickerOpen()}
+          agentPickerBusy={agentPickerBusy()}
+          agentPickerError={agentPickerError()}
+          agentOptions={agentOptions()}
+          onToggleAgentPicker={openAgentPicker}
+          onSelectAgent={(agent) => {
+            applySessionAgent(agent);
+            setAgentPickerOpen(false);
+          }}
+          setAgentPickerRef={(el) => {
+            agentPickerRef = el;
+          }}
+          showNotionBanner={props.showTryNotionPrompt}
+          onNotionBannerClick={props.onTryNotionPrompt}
+          toast={toastMessage()}
+          onToast={(message) => setToastMessage(message)}
+          listAgents={props.listAgents}
+          recentFiles={props.workingFiles}
+          searchFiles={props.searchFiles}
+          listCommands={props.listCommands}
+          isRemoteWorkspace={props.activeWorkspaceDisplay.workspaceType === "remote"}
+          attachmentsEnabled={attachmentsEnabled()}
+          attachmentsDisabledReason={attachmentsDisabledReason()}
+        />
 
       </main>
 
@@ -1744,60 +1778,56 @@ export default function SessionView(props: SessionViewProps) {
         <div class="space-y-1 pt-2">
           <button
             type="button"
-            class={`w-full h-10 flex items-center gap-3 px-3 rounded-lg text-sm font-medium transition-colors ${
-              showRightSidebarSelection() && props.tab === "scheduled"
-                ? "bg-dls-active text-dls-text"
-                : "text-dls-secondary hover:text-dls-text hover:bg-dls-hover"
-            }`}
+            class={`w-full h-10 flex items-center gap-3 px-3 rounded-lg text-sm font-medium transition-colors ${showRightSidebarSelection() && props.tab === "scheduled"
+              ? "bg-dls-active text-dls-text"
+              : "text-dls-secondary hover:text-dls-text hover:bg-dls-hover"
+              }`}
             onClick={() => {
               props.setTab("scheduled");
               props.setView("dashboard");
             }}
           >
             <History size={18} />
-            Automations
+            {tr("session.right_sidebar.automations")}
           </button>
           <button
             type="button"
-            class={`w-full h-10 flex items-center gap-3 px-3 rounded-lg text-sm font-medium transition-colors ${
-              showRightSidebarSelection() && props.tab === "skills"
-                ? "bg-dls-active text-dls-text"
-                : "text-dls-secondary hover:text-dls-text hover:bg-dls-hover"
-            }`}
+            class={`w-full h-10 flex items-center gap-3 px-3 rounded-lg text-sm font-medium transition-colors ${showRightSidebarSelection() && props.tab === "skills"
+              ? "bg-dls-active text-dls-text"
+              : "text-dls-secondary hover:text-dls-text hover:bg-dls-hover"
+              }`}
             onClick={() => {
               props.setTab("skills");
               props.setView("dashboard");
             }}
           >
             <Zap size={18} />
-            Skills
+            {tr("session.right_sidebar.skills")}
           </button>
           <button
             type="button"
-            class={`w-full h-10 flex items-center gap-3 px-3 rounded-lg text-sm font-medium transition-colors ${
-              showRightSidebarSelection() && props.tab === "mcp"
-                ? "bg-dls-active text-dls-text"
-                : "text-dls-secondary hover:text-dls-text hover:bg-dls-hover"
-            }`}
+            class={`w-full h-10 flex items-center gap-3 px-3 rounded-lg text-sm font-medium transition-colors ${showRightSidebarSelection() && props.tab === "mcp"
+              ? "bg-dls-active text-dls-text"
+              : "text-dls-secondary hover:text-dls-text hover:bg-dls-hover"
+              }`}
             onClick={() => {
               props.setTab("mcp");
               props.setView("dashboard");
             }}
           >
             <Box size={18} />
-            Apps
+            {tr("session.right_sidebar.apps")}
           </button>
           <button
             type="button"
-            class={`w-full h-10 flex items-center gap-3 px-3 rounded-lg text-sm font-medium transition-colors ${
-              showRightSidebarSelection() && props.tab === "config"
-                ? "bg-dls-active text-dls-text"
-                : "text-dls-secondary hover:text-dls-text hover:bg-dls-hover"
-            }`}
+            class={`w-full h-10 flex items-center gap-3 px-3 rounded-lg text-sm font-medium transition-colors ${showRightSidebarSelection() && props.tab === "config"
+              ? "bg-dls-active text-dls-text"
+              : "text-dls-secondary hover:text-dls-text hover:bg-dls-hover"
+              }`}
             onClick={openConfig}
           >
             <SlidersHorizontal size={18} />
-            Config
+            {tr("session.right_sidebar.config")}
           </button>
         </div>
 
@@ -1810,7 +1840,7 @@ export default function SessionView(props: SessionViewProps) {
             class="flex items-center gap-3 px-3 py-2 rounded-lg text-dls-secondary hover:bg-dls-hover transition-colors"
           >
             <Settings size={18} />
-            <span class="text-sm font-medium">Settings</span>
+            <span class="text-sm font-medium">{tr("session.sidebar.settings")}</span>
           </button>
         </div>
       </aside>
@@ -1881,16 +1911,16 @@ export default function SessionView(props: SessionViewProps) {
                   <Shield size={24} />
                 </div>
                 <div>
-                  <h3 class="text-lg font-semibold text-gray-12">Permission Required</h3>
-                  <p class="text-sm text-gray-11 mt-1">OpenCode is requesting permission to continue.</p>
+                  <h3 class="text-lg font-semibold text-gray-12">{tr("session.permission.title")}</h3>
+                  <p class="text-sm text-gray-11 mt-1">{tr("session.permission.subtitle")}</p>
                 </div>
               </div>
 
               <div class="bg-gray-1/50 rounded-xl p-4 border border-gray-6 mb-6">
-                <div class="text-xs text-gray-10 uppercase tracking-wider mb-2 font-semibold">Permission</div>
+                <div class="text-xs text-gray-10 uppercase tracking-wider mb-2 font-semibold">{tr("session.permission.label")}</div>
                 <div class="text-sm text-gray-12 font-mono">{props.activePermission?.permission}</div>
 
-                <div class="text-xs text-gray-10 uppercase tracking-wider mt-4 mb-2 font-semibold">Scope</div>
+                <div class="text-xs text-gray-10 uppercase tracking-wider mt-4 mb-2 font-semibold">{tr("session.permission.scope")}</div>
                 <div class="flex items-center gap-2 text-sm font-mono text-amber-12 bg-amber-1/30 px-2 py-1 rounded border border-amber-7/20">
                   <HardDrive size={12} />
                   {props.activePermission?.patterns.join(", ")}
@@ -1898,7 +1928,7 @@ export default function SessionView(props: SessionViewProps) {
 
                 <Show when={Object.keys(props.activePermission?.metadata ?? {}).length > 0}>
                   <details class="mt-4 rounded-lg bg-gray-1/20 p-2">
-                    <summary class="cursor-pointer text-xs text-gray-11">Details</summary>
+                    <summary class="cursor-pointer text-xs text-gray-11">{tr("session.permission.details")}</summary>
                     <pre class="mt-2 whitespace-pre-wrap break-words text-xs text-gray-12">
                       {props.safeStringify(props.activePermission?.metadata)}
                     </pre>
@@ -1916,7 +1946,7 @@ export default function SessionView(props: SessionViewProps) {
                   disabled={props.permissionReplyBusy}
                 >
 
-                  Deny
+                  {tr("session.permission.deny")}
                 </Button>
                 <div class="grid grid-cols-2 gap-2">
                   <Button
@@ -1925,7 +1955,7 @@ export default function SessionView(props: SessionViewProps) {
                     onClick={() => props.activePermission && props.respondPermission(props.activePermission.id, "once")}
                     disabled={props.permissionReplyBusy}
                   >
-                    Once
+                    {tr("session.permission.once")}
                   </Button>
                   <Button
                     variant="primary"
@@ -1936,7 +1966,7 @@ export default function SessionView(props: SessionViewProps) {
                     }
                     disabled={props.permissionReplyBusy}
                   >
-                    Allow for session
+                    {tr("session.permission.allow")}
                   </Button>
                 </div>
               </div>

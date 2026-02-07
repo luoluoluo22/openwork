@@ -515,6 +515,20 @@ export async function uninstallSkill(projectDir: string, name: string): Promise<
   return invoke<ExecResult>("uninstall_skill", { projectDir, name });
 }
 
+export async function writeSkillFile(
+  projectDir: string,
+  skillName: string,
+  subsitePath: string,
+  content: string,
+): Promise<ExecResult> {
+  return invoke<ExecResult>("write_skill_file", {
+    projectDir,
+    skillName,
+    subsitePath,
+    content,
+  });
+}
+
 export type OpencodeConfigFile = {
   path: string;
   exists: boolean;

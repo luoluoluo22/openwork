@@ -227,13 +227,33 @@ export default function App() {
   const [themeMode, setThemeMode] = createSignal<ThemeMode>(getInitialThemeMode());
 
   const [engineSource, setEngineSource] = createSignal<"path" | "sidecar">(
-    isTauriRuntime() ? "sidecar" : "path"
+    (() => {
+      const stored = typeof window !== "undefined" ? window.localStorage.getItem("openwork.engineSource") : null;
+      if (stored === "path" || stored === "sidecar") return stored;
+      return isTauriRuntime() ? "sidecar" : "path";
+    })()
   );
 
-  const [engineRuntime, setEngineRuntime] = createSignal<EngineRuntime>("openwrk");
+  const [engineRuntime, setEngineRuntime] = createSignal<EngineRuntime>(
+    (() => {
+      const stored = typeof window !== "undefined" ? window.localStorage.getItem("openwork.engineRuntime") : null;
+      if (stored === "direct" || stored === "openwrk") return stored as EngineRuntime;
+      return "openwrk";
+    })()
+  );
 
-  const [baseUrl, setBaseUrl] = createSignal("http://127.0.0.1:4096");
-  const [clientDirectory, setClientDirectory] = createSignal("");
+  const [baseUrl, setBaseUrl] = createSignal(
+    (() => {
+      // 在浏览器开发模式下使用相对路径，让 Vite 代理处理请求
+      if (!isTauriRuntime()) {
+        return "";
+      }
+      return (typeof window !== "undefined" && window.localStorage.getItem("openwork.baseUrl")) || "http://127.0.0.1:4096";
+    })()
+  );
+  const [clientDirectory, setClientDirectory] = createSignal(
+    (typeof window !== "undefined" && window.localStorage.getItem("openwork.clientDirectory")) || ""
+  );
 
   const [openworkServerSettings, setOpenworkServerSettings] = createSignal<OpenworkServerSettings>({});
   const [openworkServerUrl, setOpenworkServerUrl] = createSignal("");
@@ -251,6 +271,10 @@ export default function App() {
   const [devtoolsWorkspaceId, setDevtoolsWorkspaceId] = createSignal<string | null>(null);
 
   const openworkServerBaseUrl = createMemo(() => {
+    // 在浏览器开发模式下使用相对路径，让 Vite 代理处理请求
+    if (!isTauriRuntime()) {
+      return "";
+    }
     const pref = startupPreference();
     const hostInfo = openworkServerHostInfo();
     const settingsUrl = normalizeOpenworkServerUrl(openworkServerSettings().urlOverride ?? "") ?? "";
@@ -588,7 +612,18 @@ export default function App() {
   >({});
   const [sessionModelOverridesReady, setSessionModelOverridesReady] = createSignal(false);
   const [workspaceDefaultModelReady, setWorkspaceDefaultModelReady] = createSignal(false);
-  const [legacyDefaultModel, setLegacyDefaultModel] = createSignal<ModelRef>(DEFAULT_MODEL);
+
+  const initialDefaultModel = (() => {
+    if (typeof window === "undefined") return DEFAULT_MODEL;
+    try {
+      return parseModelRef(window.localStorage.getItem(MODEL_PREF_KEY)) || DEFAULT_MODEL;
+    } catch {
+      return DEFAULT_MODEL;
+    }
+  })();
+
+  const [legacyDefaultModel, setLegacyDefaultModel] = createSignal<ModelRef>(initialDefaultModel);
+  const [defaultModel, setDefaultModel] = createSignal<ModelRef>(initialDefaultModel);
   const [defaultModelExplicit, setDefaultModelExplicit] = createSignal(false);
   const [sessionAgentById, setSessionAgentById] = createSignal<Record<string, string>>({});
   const [providerAuthModalOpen, setProviderAuthModalOpen] = createSignal(false);
@@ -907,7 +942,7 @@ export default function App() {
     if (!trimmed) {
       throw new Error("Session name is required");
     }
-    
+
     await renameSession(sessionID, trimmed);
     await refreshSidebarWorkspaceSessions(workspaceStore.activeWorkspaceId()).catch(() => undefined);
   }
@@ -1221,6 +1256,8 @@ export default function App() {
     addPlugin,
     importLocalSkill,
     installSkillCreator,
+    installOpkgSkill,
+    installJianyingSkillDirect,
     revealSkillsFolder,
     uninstallSkill,
     readSkill,
@@ -1242,7 +1279,7 @@ export default function App() {
     globalSync.set("provider", "connected", value);
   };
 
-  const [defaultModel, setDefaultModel] = createSignal<ModelRef>(DEFAULT_MODEL);
+
   const sessionModelOverridesKey = (workspaceId: string) =>
     `${SESSION_MODEL_PREF_KEY}.${workspaceId}`;
 
@@ -1337,9 +1374,15 @@ export default function App() {
   >("session");
   const [modelPickerQuery, setModelPickerQuery] = createSignal("");
 
-  const [showThinking, setShowThinking] = createSignal(false);
-  const [hideTitlebar, setHideTitlebar] = createSignal(false);
-  const [modelVariant, setModelVariant] = createSignal<string | null>(null);
+  const [showThinking, setShowThinking] = createSignal(
+    typeof window !== "undefined" && window.localStorage.getItem(THINKING_PREF_KEY) === "true"
+  );
+  const [hideTitlebar, setHideTitlebar] = createSignal(
+    typeof window !== "undefined" && window.localStorage.getItem(HIDE_TITLEBAR_PREF_KEY) === "true"
+  );
+  const [modelVariant, setModelVariant] = createSignal<string | null>(
+    typeof window !== "undefined" ? window.localStorage.getItem(VARIANT_PREF_KEY) : null
+  );
 
   const MODEL_VARIANT_OPTIONS = [
     { value: "none", label: "None" },
@@ -1882,9 +1925,9 @@ export default function App() {
     setRenameWorkspaceId(workspaceId);
     setRenameWorkspaceName(
       workspace.displayName?.trim() ||
-        workspace.openworkWorkspaceName?.trim() ||
-        workspace.name?.trim() ||
-        ""
+      workspace.openworkWorkspaceName?.trim() ||
+      workspace.name?.trim() ||
+      ""
     );
     setRenameWorkspaceOpen(true);
   };
@@ -2839,6 +2882,7 @@ export default function App() {
     if (modelPickerTarget() === "default") {
       setDefaultModelExplicit(true);
       setDefaultModel(next);
+      setLegacyDefaultModel(next);
       setModelPickerOpen(false);
       return;
     }
@@ -2852,6 +2896,7 @@ export default function App() {
     setSessionModelOverrideById((current) => ({ ...current, [id]: next }));
     setDefaultModelExplicit(true);
     setDefaultModel(next);
+    setLegacyDefaultModel(next);
     setModelPickerOpen(false);
 
     if (typeof window !== "undefined" && currentView() === "session") {
@@ -3445,100 +3490,6 @@ export default function App() {
 
     if (typeof window !== "undefined") {
       try {
-        const storedBaseUrl = window.localStorage.getItem("openwork.baseUrl");
-        if (storedBaseUrl) {
-          setBaseUrl(storedBaseUrl);
-        }
-
-        const storedClientDir = window.localStorage.getItem(
-          "openwork.clientDirectory"
-        );
-        if (storedClientDir) {
-          setClientDirectory(storedClientDir);
-        }
-
-        const storedEngineSource = window.localStorage.getItem(
-          "openwork.engineSource"
-        );
-        if (storedEngineSource === "path" || storedEngineSource === "sidecar") {
-          setEngineSource(storedEngineSource);
-        }
-
-        const storedEngineRuntime = window.localStorage.getItem(
-          "openwork.engineRuntime"
-        );
-        if (storedEngineRuntime === "direct" || storedEngineRuntime === "openwrk") {
-          setEngineRuntime(storedEngineRuntime);
-        }
-
-        const storedDefaultModel = window.localStorage.getItem(MODEL_PREF_KEY);
-        const parsedDefaultModel = parseModelRef(storedDefaultModel);
-        if (parsedDefaultModel) {
-          setDefaultModel(parsedDefaultModel);
-          setLegacyDefaultModel(parsedDefaultModel);
-        } else {
-          setDefaultModel(DEFAULT_MODEL);
-          setLegacyDefaultModel(DEFAULT_MODEL);
-          try {
-            window.localStorage.setItem(
-              MODEL_PREF_KEY,
-              formatModelRef(DEFAULT_MODEL)
-            );
-          } catch {
-            // ignore
-          }
-        }
-
-        const storedThinking = window.localStorage.getItem(THINKING_PREF_KEY);
-        if (storedThinking != null) {
-          try {
-            const parsed = JSON.parse(storedThinking);
-            if (typeof parsed === "boolean") {
-              setShowThinking(parsed);
-            }
-          } catch {
-            // ignore
-          }
-        }
-
-        const storedHideTitlebar = window.localStorage.getItem(HIDE_TITLEBAR_PREF_KEY);
-        if (storedHideTitlebar != null) {
-          try {
-            const parsed = JSON.parse(storedHideTitlebar);
-            if (typeof parsed === "boolean") {
-              setHideTitlebar(parsed);
-            }
-          } catch {
-            // ignore
-          }
-        }
-
-        const storedVariant = window.localStorage.getItem(VARIANT_PREF_KEY);
-        if (storedVariant && storedVariant.trim()) {
-          const normalized = normalizeModelVariant(storedVariant);
-          if (normalized) {
-            setModelVariant(normalized);
-          }
-        }
-
-        const storedUpdateAutoCheck = window.localStorage.getItem(
-          "openwork.updateAutoCheck"
-        );
-        if (storedUpdateAutoCheck === "0" || storedUpdateAutoCheck === "1") {
-          setUpdateAutoCheck(storedUpdateAutoCheck === "1");
-        }
-
-        const storedUpdateAutoDownload = window.localStorage.getItem(
-          "openwork.updateAutoDownload"
-        );
-        if (storedUpdateAutoDownload === "0" || storedUpdateAutoDownload === "1") {
-          const enabled = storedUpdateAutoDownload === "1";
-          setUpdateAutoDownload(enabled);
-          if (enabled) {
-            setUpdateAutoCheck(true);
-          }
-        }
-
         const storedUpdateCheckedAt = window.localStorage.getItem(
           "openwork.updateLastCheckedAt"
         );
@@ -3697,9 +3648,15 @@ export default function App() {
           // ignore
         }
       }
+      // 优先级：用户手动选择的模型 > 配置文件中的模型 > 硬编码默认值
+      // 只有当用户从未手动选择过模型时，才使用配置文件中的模型
+      const userSelectedModel = legacyDefaultModel();
+      const hasUserSelection = userSelectedModel && !modelEquals(userSelectedModel, DEFAULT_MODEL);
 
-      setDefaultModelExplicit(Boolean(configDefault));
-      const nextDefault = configDefault ?? legacyDefaultModel();
+      // 如果用户有手动选择过模型，优先使用用户的选择
+      const nextDefault = hasUserSelection ? userSelectedModel : (configDefault ?? userSelectedModel);
+      setDefaultModelExplicit(Boolean(configDefault) || hasUserSelection);
+
       const currentDefault = untrack(defaultModel);
       if (nextDefault && !modelEquals(currentDefault, nextDefault)) {
         setDefaultModel(nextDefault);
@@ -3803,10 +3760,7 @@ export default function App() {
   createEffect(() => {
     if (typeof window === "undefined") return;
     try {
-      window.localStorage.setItem(
-        "openwork.clientDirectory",
-        clientDirectory()
-      );
+      window.localStorage.setItem("openwork.clientDirectory", clientDirectory());
     } catch {
       // ignore
     }
@@ -3843,10 +3797,7 @@ export default function App() {
   createEffect(() => {
     if (typeof window === "undefined") return;
     try {
-      window.localStorage.setItem(
-        MODEL_PREF_KEY,
-        formatModelRef(defaultModel())
-      );
+      window.localStorage.setItem(MODEL_PREF_KEY, formatModelRef(legacyDefaultModel()));
     } catch {
       // ignore
     }
@@ -3855,10 +3806,7 @@ export default function App() {
   createEffect(() => {
     if (typeof window === "undefined") return;
     try {
-      window.localStorage.setItem(
-        "openwork.updateAutoCheck",
-        updateAutoCheck() ? "1" : "0"
-      );
+      window.localStorage.setItem("openwork.updateAutoCheck", updateAutoCheck() ? "1" : "0");
     } catch {
       // ignore
     }
@@ -4199,6 +4147,8 @@ export default function App() {
       canUseDesktopTools,
       importLocalSkill,
       installSkillCreator,
+      installOpkgSkill,
+      installJianyingSkillDirect,
       revealSkillsFolder,
       uninstallSkill,
       readSkill,
@@ -4221,6 +4171,7 @@ export default function App() {
       createSessionAndOpen,
       setPrompt,
       selectSession: selectSession,
+      deleteSession: deleteSessionById,
       defaultModelLabel: formatModelLabel(defaultModel(), providers()),
       defaultModelRef: formatModelRef(defaultModel()),
       openDefaultModelPicker,

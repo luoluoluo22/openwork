@@ -1,4 +1,5 @@
 import { For, Match, Show, Switch, createEffect, createMemo, createSignal, onCleanup } from "solid-js";
+import { t, currentLocale } from "../../i18n";
 import type {
   DashboardTab,
   McpServerEntry,
@@ -45,6 +46,7 @@ import {
   Plus,
   Settings,
   SlidersHorizontal,
+  Trash2,
   Zap,
 } from "lucide-solid";
 
@@ -136,6 +138,8 @@ export type DashboardViewProps = {
   canUseDesktopTools: boolean;
   importLocalSkill: () => void;
   installSkillCreator: () => void;
+  installOpkgSkill: (pkg: string) => void;
+  installJianyingSkillDirect: () => void;
   revealSkillsFolder: () => void;
   uninstallSkill: (name: string) => void;
   readSkill: (name: string) => Promise<{ name: string; path: string; content: string } | null>;
@@ -185,6 +189,7 @@ export type DashboardViewProps = {
   createSessionAndOpen: () => void;
   setPrompt: (value: string) => void;
   selectSession: (sessionId: string) => Promise<void> | void;
+  deleteSession: (sessionId: string) => Promise<void>;
   defaultModelLabel: string;
   defaultModelRef: string;
   openDefaultModelPicker: () => void;
@@ -238,25 +243,28 @@ export type DashboardViewProps = {
   notionError: string | null;
   notionBusy: boolean;
   connectNotion: () => void;
+  language: "en" | "zh";
+  setLanguage: (language: "en" | "zh") => void;
 };
 
 export default function DashboardView(props: DashboardViewProps) {
+  const tr = (key: string) => t(key, currentLocale());
   const title = createMemo(() => {
     switch (props.tab) {
       case "scheduled":
-        return "Automations";
+        return tr("dashboard.nav.automations");
       case "skills":
-        return "Skills";
+        return tr("dashboard.nav.skills");
       case "plugins":
         return "Plugins";
       case "mcp":
-        return "Apps";
+        return tr("dashboard.nav.apps");
       case "config":
-        return "Config";
+        return tr("dashboard.nav.config");
       case "settings":
-        return "Settings";
+        return tr("dashboard.nav.settings");
       default:
-        return "Automations";
+        return tr("dashboard.nav.automations");
     }
   });
 
@@ -361,7 +369,7 @@ export default function DashboardView(props: DashboardViewProps) {
   const showMoreLabel = (workspaceId: string, total: number) => {
     const remaining = Math.max(0, total - previewCount(workspaceId));
     const nextCount = Math.min(MAX_SESSIONS_PREVIEW, remaining);
-    return nextCount > 0 ? `Show ${nextCount} more` : "Show more";
+    return nextCount > 0 ? tr("dashboard.workspace.show_n_more").replace("{n}", String(nextCount)) : tr("dashboard.workspace.show_more");
   };
   const [workspaceMenuId, setWorkspaceMenuId] = createSignal<string | null>(null);
   let workspaceMenuRef: HTMLDivElement | undefined;
@@ -471,11 +479,10 @@ export default function DashboardView(props: DashboardViewProps) {
     const active = () => props.tab === t;
     return (
       <button
-        class={`w-full h-10 flex items-center gap-3 px-3 rounded-lg text-sm font-medium transition-colors ${
-          active()
-            ? "bg-dls-active text-dls-text"
-            : "text-dls-secondary hover:text-dls-text hover:bg-dls-hover"
-        }`}
+        class={`w-full h-10 flex items-center gap-3 px-3 rounded-lg text-sm font-medium transition-colors ${active()
+          ? "bg-dls-active text-dls-text"
+          : "text-dls-secondary hover:text-dls-text hover:bg-dls-hover"
+          }`}
         onClick={() => props.setTab(t)}
       >
         {icon}
@@ -707,9 +714,8 @@ export default function DashboardView(props: DashboardViewProps) {
                 when={props.updateStatus?.state === "downloading"}
                 fallback={
                   <span
-                    class={`w-2 h-2 rounded-full ${
-                      props.updateStatus?.state === "ready" ? "bg-green-9" : "bg-amber-9"
-                    }`}
+                    class={`w-2 h-2 rounded-full ${props.updateStatus?.state === "ready" ? "bg-green-9" : "bg-amber-9"
+                      }`}
                   />
                 }
               >
@@ -724,7 +730,7 @@ export default function DashboardView(props: DashboardViewProps) {
             </button>
           </Show>
           <div class="flex items-center text-[11px] font-bold text-dls-secondary uppercase px-3 mb-3 pt-2 tracking-tight">
-            <span>Tasks</span>
+            <span>{tr("dashboard.nav.tasks")}</span>
           </div>
 
           <div class="space-y-3 mb-3">
@@ -780,9 +786,9 @@ export default function DashboardView(props: DashboardViewProps) {
                         <Show when={group.status === "error"}>
                           <span
                             class="text-[10px] px-2 py-0.5 rounded-full border border-red-7/50 text-red-11 bg-red-3/30"
-                            title={group.error ?? "Failed to load tasks"}
+                            title={group.error ?? tr("dashboard.workspace.failed_to_load")}
                           >
-                            Error
+                            {tr("dashboard.workspace.error")}
                           </span>
                         </Show>
                         <Show when={group.status === "ready" && group.sessions.length > 0}>
@@ -835,7 +841,7 @@ export default function DashboardView(props: DashboardViewProps) {
                               setWorkspaceMenuId(null);
                             }}
                           >
-                            Edit name
+                            {tr("dashboard.workspace.edit_name")}
                           </button>
                           <button
                             type="button"
@@ -845,7 +851,7 @@ export default function DashboardView(props: DashboardViewProps) {
                               setWorkspaceMenuId(null);
                             }}
                           >
-                            Share...
+                            {tr("dashboard.workspace.share")}
                           </button>
                           <Show when={workspace().workspaceType === "remote"}>
                             <button
@@ -856,7 +862,7 @@ export default function DashboardView(props: DashboardViewProps) {
                                 setWorkspaceMenuId(null);
                               }}
                             >
-                              Edit connection
+                              {tr("dashboard.workspace.edit_connection")}
                             </button>
                           </Show>
                           <button
@@ -867,7 +873,7 @@ export default function DashboardView(props: DashboardViewProps) {
                               setWorkspaceMenuId(null);
                             }}
                           >
-                            Remove workspace
+                            {tr("dashboard.workspace.remove")}
                           </button>
                         </div>
                       </Show>
@@ -885,11 +891,10 @@ export default function DashboardView(props: DashboardViewProps) {
                                   <div
                                     role="button"
                                     tabIndex={0}
-                                    class={`group flex items-center justify-between h-8 px-3 rounded-lg cursor-pointer relative overflow-hidden ml-2 w-[calc(100%-0.5rem)] ${
-                                      isSelected()
-                                        ? "bg-dls-active text-dls-text"
-                                        : "hover:bg-dls-hover"
-                                    }`}
+                                    class={`group flex items-center justify-between h-8 px-3 rounded-lg cursor-pointer relative ml-2 w-[calc(100%-0.5rem)] ${isSelected()
+                                      ? "bg-dls-active text-dls-text"
+                                      : "hover:bg-dls-hover"
+                                      }`}
                                     onClick={() => openSessionFromList(workspace().id, session.id)}
                                     onKeyDown={(event) => {
                                       if (event.key !== "Enter" && event.key !== " ") return;
@@ -897,12 +902,27 @@ export default function DashboardView(props: DashboardViewProps) {
                                       openSessionFromList(workspace().id, session.id);
                                     }}
                                   >
-                                    <span class="text-sm text-dls-text truncate mr-2 font-medium">
+                                    <span class="text-sm truncate mr-10 font-medium flex-1">
                                       {session.title}
                                     </span>
-                                    <span class="text-xs text-dls-secondary whitespace-nowrap">
-                                      {formatRelativeTime(session.time?.updated ?? Date.now())}
-                                    </span>
+                                    <div class="flex items-center shrink-0">
+                                      <span class="text-xs text-dls-secondary whitespace-nowrap group-hover:invisible">
+                                        {formatRelativeTime(session.time?.updated ?? Date.now())}
+                                      </span>
+                                      <button
+                                        type="button"
+                                        class="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 flex items-center justify-center w-6 h-6 rounded-md text-dls-secondary hover:text-red-11 hover:bg-red-3/40 transition-all z-20"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          if (confirm(tr("dashboard.session.delete_confirm"))) {
+                                            void props.deleteSession(session.id);
+                                          }
+                                        }}
+                                        title={tr("dashboard.session.delete")}
+                                      >
+                                        <Trash2 size={14} />
+                                      </button>
+                                    </div>
                                   </div>
                                 );
                               }}
@@ -919,9 +939,9 @@ export default function DashboardView(props: DashboardViewProps) {
                                 <Show when={group.status === "error"}>
                                   <div
                                     class="w-full px-3 py-2 text-xs text-red-11 ml-2 text-left rounded-lg bg-red-3/20 border border-red-7/40"
-                                    title={group.error ?? "Failed to load tasks"}
+                                    title={group.error ?? tr("dashboard.workspace.failed_to_load")}
                                   >
-                                    Failed to load tasks
+                                    {tr("dashboard.workspace.failed_to_load")}
                                   </div>
                                 </Show>
                               }
@@ -933,11 +953,10 @@ export default function DashboardView(props: DashboardViewProps) {
                                     <div
                                       role="button"
                                       tabIndex={0}
-                                      class={`group flex items-center justify-between h-8 px-3 rounded-lg cursor-pointer relative overflow-hidden ml-2 w-[calc(100%-0.5rem)] ${
-                                        isSelected()
-                                          ? "bg-dls-active text-dls-text"
-                                          : "hover:bg-dls-hover"
-                                      }`}
+                                      class={`group flex items-center justify-between h-8 px-3 rounded-lg cursor-pointer relative ml-2 w-[calc(100%-0.5rem)] ${isSelected()
+                                        ? "bg-dls-active text-dls-text"
+                                        : "hover:bg-dls-hover"
+                                        }`}
                                       onClick={() => openSessionFromList(workspace().id, session.id)}
                                       onKeyDown={(event) => {
                                         if (event.key !== "Enter" && event.key !== " ") return;
@@ -945,12 +964,27 @@ export default function DashboardView(props: DashboardViewProps) {
                                         openSessionFromList(workspace().id, session.id);
                                       }}
                                     >
-                                      <span class="text-sm text-dls-text truncate mr-2 font-medium">
+                                      <span class="text-sm truncate mr-10 font-medium flex-1">
                                         {session.title}
                                       </span>
-                                      <span class="text-xs text-dls-secondary whitespace-nowrap">
-                                        {formatRelativeTime(session.time?.updated ?? Date.now())}
-                                      </span>
+                                      <div class="flex items-center shrink-0">
+                                        <span class="text-xs text-dls-secondary whitespace-nowrap group-hover:invisible">
+                                          {formatRelativeTime(session.time?.updated ?? Date.now())}
+                                        </span>
+                                        <button
+                                          type="button"
+                                          class="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 flex items-center justify-center w-6 h-6 rounded-md text-dls-secondary hover:text-red-11 hover:bg-red-3/40 transition-all z-20"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (confirm(tr("dashboard.session.delete_confirm"))) {
+                                              void props.deleteSession(session.id);
+                                            }
+                                          }}
+                                          title={tr("dashboard.session.delete")}
+                                        >
+                                          <Trash2 size={14} />
+                                        </button>
+                                      </div>
                                     </div>
                                   );
                                 }}
@@ -963,8 +997,8 @@ export default function DashboardView(props: DashboardViewProps) {
                                   onClick={() => createTaskInWorkspace(workspace().id)}
                                   disabled={props.newTaskDisabled}
                                 >
-                                  <span class="group-hover/empty:hidden">No tasks yet.</span>
-                                  <span class="hidden group-hover/empty:inline font-medium">+ New task</span>
+                                  <span class="group-hover/empty:hidden">{tr("dashboard.workspace.no_tasks")}</span>
+                                  <span class="hidden group-hover/empty:inline font-medium">{tr("dashboard.workspace.new_task")}</span>
                                 </button>
                               </Show>
 
@@ -981,7 +1015,7 @@ export default function DashboardView(props: DashboardViewProps) {
                           }
                         >
                           <div class="w-full px-3 py-2 text-xs text-dls-secondary ml-2 text-left rounded-lg">
-                            Loading tasks...
+                            {tr("dashboard.workspace.loading_tasks")}
                           </div>
                         </Show>
                       </Show>
@@ -999,7 +1033,7 @@ export default function DashboardView(props: DashboardViewProps) {
               onClick={() => setAddWorkspaceMenuOpen((prev) => !prev)}
             >
               <Plus size={14} />
-              Add a workspace
+              {tr("dashboard.workspace.add")}
             </button>
             <Show when={addWorkspaceMenuOpen()}>
               <div class="absolute left-0 right-0 top-full mt-2 rounded-lg border border-dls-border bg-dls-surface shadow-xl overflow-hidden z-20">
@@ -1012,7 +1046,7 @@ export default function DashboardView(props: DashboardViewProps) {
                   }}
                 >
                   <Plus size={12} />
-                  New workspace
+                  {tr("dashboard.workspace.new")}
                 </button>
                 <button
                   type="button"
@@ -1023,7 +1057,7 @@ export default function DashboardView(props: DashboardViewProps) {
                   }}
                 >
                   <Plus size={12} />
-                  Connect remote
+                  {tr("dashboard.workspace.connect_remote")}
                 </button>
                 <button
                   type="button"
@@ -1035,7 +1069,7 @@ export default function DashboardView(props: DashboardViewProps) {
                   }}
                 >
                   <Plus size={12} />
-                  Import config
+                  {tr("dashboard.workspace.import_config")}
                 </button>
               </div>
             </Show>
@@ -1049,7 +1083,7 @@ export default function DashboardView(props: DashboardViewProps) {
             class="flex items-center gap-3 px-3 py-2 rounded-lg text-dls-secondary hover:bg-dls-hover transition-colors"
           >
             <Settings size={18} />
-            <span class="text-sm font-medium">Settings</span>
+            <span class="text-sm font-medium">{tr("dashboard.nav.settings")}</span>
           </button>
         </div>
       </aside>
@@ -1069,9 +1103,8 @@ export default function DashboardView(props: DashboardViewProps) {
                   when={props.updateStatus?.state === "downloading"}
                   fallback={
                     <span
-                      class={`w-2 h-2 rounded-full ${
-                        props.updateStatus?.state === "ready" ? "bg-green-9" : "bg-amber-9"
-                      }`}
+                      class={`w-2 h-2 rounded-full ${props.updateStatus?.state === "ready" ? "bg-green-9" : "bg-amber-9"
+                        }`}
                     />
                   }
                 >
@@ -1129,6 +1162,8 @@ export default function DashboardView(props: DashboardViewProps) {
                 skillsStatus={props.skillsStatus}
                 importLocalSkill={props.importLocalSkill}
                 installSkillCreator={props.installSkillCreator}
+                installOpkgSkill={props.installOpkgSkill}
+                installJianyingSkillDirect={props.installJianyingSkillDirect}
                 revealSkillsFolder={props.revealSkillsFolder}
                 uninstallSkill={props.uninstallSkill}
                 readSkill={props.readSkill}
@@ -1207,76 +1242,78 @@ export default function DashboardView(props: DashboardViewProps) {
             </Match>
 
             <Match when={props.tab === "settings"}>
-                <SettingsView
-                  startupPreference={props.startupPreference}
-                  baseUrl={props.baseUrl}
-                  headerStatus={props.headerStatus}
-                  busy={props.busy}
-                  settingsTab={props.settingsTab}
-                  setSettingsTab={props.setSettingsTab}
-                  providers={props.providers}
-                  providerConnectedIds={props.providerConnectedIds}
-                  providerAuthBusy={props.providerAuthBusy}
-                  openProviderAuthModal={props.openProviderAuthModal}
-                  openworkServerStatus={props.openworkServerStatus}
-                  openworkServerUrl={props.openworkServerUrl}
-                  openworkServerHostInfo={props.openworkServerHostInfo}
-                  openworkServerCapabilities={props.openworkServerCapabilities}
-                  openworkServerDiagnostics={props.openworkServerDiagnostics}
-                  openworkServerWorkspaceId={props.openworkServerWorkspaceId}
-                  openworkAuditEntries={props.openworkAuditEntries}
-                  openworkAuditStatus={props.openworkAuditStatus}
-                  openworkAuditError={props.openworkAuditError}
-                  opencodeConnectStatus={props.opencodeConnectStatus}
-                  engineInfo={props.engineInfo}
-                  openwrkStatus={props.openwrkStatus}
-                  owpenbotInfo={props.owpenbotInfo}
-                  engineDoctorVersion={props.engineDoctorVersion}
-                  developerMode={props.developerMode}
-                  toggleDeveloperMode={props.toggleDeveloperMode}
-                  stopHost={props.stopHost}
-                  engineSource={props.engineSource}
-                  setEngineSource={props.setEngineSource}
-                  engineRuntime={props.engineRuntime}
-                  setEngineRuntime={props.setEngineRuntime}
-                  isWindows={props.isWindows}
-                  defaultModelLabel={props.defaultModelLabel}
-                  defaultModelRef={props.defaultModelRef}
-                  openDefaultModelPicker={props.openDefaultModelPicker}
-                  showThinking={props.showThinking}
-                  toggleShowThinking={props.toggleShowThinking}
-                  hideTitlebar={props.hideTitlebar}
-                  toggleHideTitlebar={props.toggleHideTitlebar}
-                  modelVariantLabel={props.modelVariantLabel}
-                  editModelVariant={props.editModelVariant}
-                  updateAutoCheck={props.updateAutoCheck}
-                  toggleUpdateAutoCheck={props.toggleUpdateAutoCheck}
-                  updateAutoDownload={props.updateAutoDownload}
-                  toggleUpdateAutoDownload={props.toggleUpdateAutoDownload}
-                  themeMode={props.themeMode}
-                  setThemeMode={props.setThemeMode}
-                  updateStatus={props.updateStatus}
-                  updateEnv={props.updateEnv}
-                  appVersion={props.appVersion}
-                  checkForUpdates={props.checkForUpdates}
-                  downloadUpdate={props.downloadUpdate}
-                  installUpdateAndRestart={props.installUpdateAndRestart}
-                  anyActiveRuns={props.anyActiveRuns}
-                  onResetStartupPreference={props.onResetStartupPreference}
-                  openResetModal={props.openResetModal}
-                  resetModalBusy={props.resetModalBusy}
-                  pendingPermissions={props.pendingPermissions}
-                  events={props.events}
-                  safeStringify={props.safeStringify}
-                  repairOpencodeCache={props.repairOpencodeCache}
-                  cacheRepairBusy={props.cacheRepairBusy}
-                  cacheRepairResult={props.cacheRepairResult}
-                  notionStatus={props.notionStatus}
-                  notionStatusDetail={props.notionStatusDetail}
-                  notionError={props.notionError}
-                  notionBusy={props.notionBusy}
-                  connectNotion={props.connectNotion}
-                />
+              <SettingsView
+                startupPreference={props.startupPreference}
+                baseUrl={props.baseUrl}
+                headerStatus={props.headerStatus}
+                busy={props.busy}
+                settingsTab={props.settingsTab}
+                setSettingsTab={props.setSettingsTab}
+                providers={props.providers}
+                providerConnectedIds={props.providerConnectedIds}
+                providerAuthBusy={props.providerAuthBusy}
+                openProviderAuthModal={props.openProviderAuthModal}
+                openworkServerStatus={props.openworkServerStatus}
+                openworkServerUrl={props.openworkServerUrl}
+                openworkServerHostInfo={props.openworkServerHostInfo}
+                openworkServerCapabilities={props.openworkServerCapabilities}
+                openworkServerDiagnostics={props.openworkServerDiagnostics}
+                openworkServerWorkspaceId={props.openworkServerWorkspaceId}
+                openworkAuditEntries={props.openworkAuditEntries}
+                openworkAuditStatus={props.openworkAuditStatus}
+                openworkAuditError={props.openworkAuditError}
+                opencodeConnectStatus={props.opencodeConnectStatus}
+                engineInfo={props.engineInfo}
+                openwrkStatus={props.openwrkStatus}
+                owpenbotInfo={props.owpenbotInfo}
+                engineDoctorVersion={props.engineDoctorVersion}
+                developerMode={props.developerMode}
+                toggleDeveloperMode={props.toggleDeveloperMode}
+                stopHost={props.stopHost}
+                engineSource={props.engineSource}
+                setEngineSource={props.setEngineSource}
+                engineRuntime={props.engineRuntime}
+                setEngineRuntime={props.setEngineRuntime}
+                isWindows={props.isWindows}
+                defaultModelLabel={props.defaultModelLabel}
+                defaultModelRef={props.defaultModelRef}
+                openDefaultModelPicker={props.openDefaultModelPicker}
+                showThinking={props.showThinking}
+                toggleShowThinking={props.toggleShowThinking}
+                hideTitlebar={props.hideTitlebar}
+                toggleHideTitlebar={props.toggleHideTitlebar}
+                modelVariantLabel={props.modelVariantLabel}
+                editModelVariant={props.editModelVariant}
+                updateAutoCheck={props.updateAutoCheck}
+                toggleUpdateAutoCheck={props.toggleUpdateAutoCheck}
+                updateAutoDownload={props.updateAutoDownload}
+                toggleUpdateAutoDownload={props.toggleUpdateAutoDownload}
+                themeMode={props.themeMode}
+                setThemeMode={props.setThemeMode}
+                updateStatus={props.updateStatus}
+                updateEnv={props.updateEnv}
+                appVersion={props.appVersion}
+                checkForUpdates={props.checkForUpdates}
+                downloadUpdate={props.downloadUpdate}
+                installUpdateAndRestart={props.installUpdateAndRestart}
+                anyActiveRuns={props.anyActiveRuns}
+                onResetStartupPreference={props.onResetStartupPreference}
+                openResetModal={props.openResetModal}
+                resetModalBusy={props.resetModalBusy}
+                pendingPermissions={props.pendingPermissions}
+                events={props.events}
+                safeStringify={props.safeStringify}
+                repairOpencodeCache={props.repairOpencodeCache}
+                cacheRepairBusy={props.cacheRepairBusy}
+                cacheRepairResult={props.cacheRepairResult}
+                notionStatus={props.notionStatus}
+                notionStatusDetail={props.notionStatusDetail}
+                notionError={props.notionError}
+                notionBusy={props.notionBusy}
+                connectNotion={props.connectNotion}
+                language={props.language}
+                setLanguage={props.setLanguage}
+              />
 
             </Match>
           </Switch>
@@ -1349,54 +1386,50 @@ export default function DashboardView(props: DashboardViewProps) {
         />
 
         <div class="fixed bottom-0 left-0 right-0">
-            <StatusBar
-              clientConnected={props.clientConnected}
-              openworkServerStatus={props.openworkServerStatus}
-              developerMode={props.developerMode}
-              onOpenSettings={() => openSettings("general")}
-              onOpenMessaging={openConfig}
-              onOpenProviders={() => props.openProviderAuthModal()}
-              onOpenMcp={() => props.setTab("mcp")}
-              providerConnectedIds={props.providerConnectedIds}
-              mcpStatuses={props.mcpStatuses}
-            />
+          <StatusBar
+            clientConnected={props.clientConnected}
+            openworkServerStatus={props.openworkServerStatus}
+            developerMode={props.developerMode}
+            onOpenSettings={() => openSettings("general")}
+            onOpenMessaging={openConfig}
+            onOpenProviders={() => props.openProviderAuthModal()}
+            onOpenMcp={() => props.setTab("mcp")}
+            providerConnectedIds={props.providerConnectedIds}
+            mcpStatuses={props.mcpStatuses}
+          />
           <nav class="md:hidden border-t border-dls-border bg-dls-surface">
             <div class="mx-auto max-w-5xl px-4 py-3 grid grid-cols-4 gap-2">
               <button
-                class={`flex flex-col items-center gap-1 text-xs ${
-                  props.tab === "scheduled" ? "text-gray-12" : "text-gray-10"
-                }`}
+                class={`flex flex-col items-center gap-1 text-xs ${props.tab === "scheduled" ? "text-gray-12" : "text-gray-10"
+                  }`}
                 onClick={() => props.setTab("scheduled")}
               >
                 <History size={18} />
-                Automations
+                {tr("dashboard.nav.automations")}
               </button>
               <button
-                class={`flex flex-col items-center gap-1 text-xs ${
-                  props.tab === "skills" ? "text-gray-12" : "text-gray-10"
-                }`}
+                class={`flex flex-col items-center gap-1 text-xs ${props.tab === "skills" ? "text-gray-12" : "text-gray-10"
+                  }`}
                 onClick={() => props.setTab("skills")}
               >
                 <Zap size={18} />
-                Skills
+                {tr("dashboard.nav.skills")}
               </button>
               <button
-                class={`flex flex-col items-center gap-1 text-xs ${
-                  props.tab === "mcp" ? "text-gray-12" : "text-gray-10"
-                }`}
+                class={`flex flex-col items-center gap-1 text-xs ${props.tab === "mcp" ? "text-gray-12" : "text-gray-10"
+                  }`}
                 onClick={() => props.setTab("mcp")}
               >
                 <Box size={18} />
-                Apps
+                {tr("dashboard.nav.apps")}
               </button>
               <button
-                class={`flex flex-col items-center gap-1 text-xs ${
-                  props.tab === "config" ? "text-gray-12" : "text-gray-10"
-                }`}
+                class={`flex flex-col items-center gap-1 text-xs ${props.tab === "config" ? "text-gray-12" : "text-gray-10"
+                  }`}
                 onClick={() => props.setTab("config")}
               >
                 <SlidersHorizontal size={18} />
-                Config
+                {tr("dashboard.nav.config")}
               </button>
             </div>
           </nav>
@@ -1405,10 +1438,10 @@ export default function DashboardView(props: DashboardViewProps) {
 
       <aside class="w-56 hidden md:flex flex-col bg-dls-sidebar border-l border-dls-border p-4">
         <div class="space-y-1 pt-2">
-          {navItem("scheduled", "Automations", <History size={18} />)}
-          {navItem("skills", "Skills", <Zap size={18} />)}
-          {navItem("mcp", "Apps", <Box size={18} />)}
-          {navItem("config", "Config", <SlidersHorizontal size={18} />)}
+          {navItem("scheduled", tr("dashboard.nav.automations"), <History size={18} />)}
+          {navItem("skills", tr("dashboard.nav.skills"), <Zap size={18} />)}
+          {navItem("mcp", tr("dashboard.nav.apps"), <Box size={18} />)}
+          {navItem("config", tr("dashboard.nav.config"), <SlidersHorizontal size={18} />)}
         </div>
 
         <div class="flex-1" />
@@ -1420,7 +1453,7 @@ export default function DashboardView(props: DashboardViewProps) {
             class="flex items-center gap-3 px-3 py-2 rounded-lg text-dls-secondary hover:bg-dls-hover transition-colors"
           >
             <Settings size={18} />
-            <span class="text-sm font-medium">Settings</span>
+            <span class="text-sm font-medium">{tr("dashboard.nav.settings")}</span>
           </button>
         </div>
       </aside>
