@@ -81,16 +81,28 @@ fn collect_global_skill_roots() -> Vec<PathBuf> {
     roots
 }
 
-fn collect_skill_roots(project_dir: &str) -> Result<Vec<PathBuf>, String> {
+fn collect_skill_roots(app: &tauri::AppHandle, project_dir: &str) -> Result<Vec<PathBuf>, String> {
     let project_dir = project_dir.trim();
     if project_dir.is_empty() {
         return Err("projectDir is required".to_string());
     }
 
     let mut roots = Vec::new();
+
+    // 1. 优先添加项目特定目录 (让本地开发版本可以覆盖内置版本)
     let project_path = PathBuf::from(project_dir);
     roots.extend(collect_project_skill_roots(&project_path));
+
+    // 2. 添加全局目录
     roots.extend(collect_global_skill_roots());
+
+    // 3. 最后添加内置技能目录作为兜底 (Tauri Resources)
+    if let Ok(resource_dir) = app.path().resource_dir() {
+        let built_in_root = resource_dir.join("resources").join("built-in-skills");
+        if built_in_root.is_dir() {
+            roots.push(built_in_root);
+        }
+    }
 
     let mut seen = HashSet::new();
     let mut unique = Vec::new();
@@ -260,7 +272,11 @@ fn extract_trigger(raw: &str) -> Option<String> {
 }
 
 fn extract_description(raw: &str) -> Option<String> {
-    // Keep this lightweight: take the first non-empty line that isn't a header or frontmatter marker.
+    // 优先从 Frontmatter 提取
+    if let Some(desc) = extract_frontmatter_value(raw, &["description", "desc"]) {
+        return Some(safe_truncate(&desc, 180));
+    }
+
     let mut in_frontmatter = false;
 
     for line in raw.lines() {
@@ -284,24 +300,27 @@ fn extract_description(raw: &str) -> Option<String> {
             continue;
         }
 
-        let max = 180;
-        if cleaned.len() > max {
-            return Some(format!("{}...", &cleaned[..max]));
-        }
-        return Some(cleaned);
+        return Some(safe_truncate(&cleaned, 180));
     }
 
     None
 }
 
+fn safe_truncate(s: &str, max_chars: usize) -> String {
+    if s.chars().count() <= max_chars {
+        return s.to_string();
+    }
+    format!("{}...", s.chars().take(max_chars).collect::<String>())
+}
+
 #[tauri::command]
-pub fn list_local_skills(project_dir: String) -> Result<Vec<LocalSkillCard>, String> {
+pub fn list_local_skills(app: tauri::AppHandle, project_dir: String) -> Result<Vec<LocalSkillCard>, String> {
     let project_dir = project_dir.trim();
     if project_dir.is_empty() {
         return Err("projectDir is required".to_string());
     }
 
-    let skill_roots = collect_skill_roots(project_dir)?;
+    let skill_roots = collect_skill_roots(&app, project_dir)?;
     let mut found: Vec<PathBuf> = Vec::new();
     let mut seen = HashSet::new();
     for root in skill_roots {
@@ -332,14 +351,14 @@ pub fn list_local_skills(project_dir: String) -> Result<Vec<LocalSkillCard>, Str
 }
 
 #[tauri::command]
-pub fn read_local_skill(project_dir: String, name: String) -> Result<LocalSkillContent, String> {
+pub fn read_local_skill(app: tauri::AppHandle, project_dir: String, name: String) -> Result<LocalSkillContent, String> {
     let project_dir = project_dir.trim();
     if project_dir.is_empty() {
         return Err("projectDir is required".to_string());
     }
 
     let name = validate_skill_name(&name)?;
-    let roots = collect_skill_roots(project_dir)?;
+    let roots = collect_skill_roots(&app, project_dir)?;
 
     for root in roots {
         let path = root.join(&name).join("SKILL.md");
@@ -359,6 +378,7 @@ pub fn read_local_skill(project_dir: String, name: String) -> Result<LocalSkillC
 
 #[tauri::command]
 pub fn write_local_skill(
+    app: tauri::AppHandle,
     project_dir: String,
     name: String,
     content: String,
@@ -369,7 +389,7 @@ pub fn write_local_skill(
     }
 
     let name = validate_skill_name(&name)?;
-    let roots = collect_skill_roots(project_dir)?;
+    let roots = collect_skill_roots(&app, project_dir)?;
     let mut target: Option<PathBuf> = None;
 
     for root in roots {
@@ -514,20 +534,28 @@ pub fn get_python_path(app: tauri::AppHandle) -> Result<String, String> {
 }
 
 #[tauri::command]
-pub fn uninstall_skill(project_dir: String, name: String) -> Result<ExecResult, String> {
+pub fn uninstall_skill(app: tauri::AppHandle, project_dir: String, name: String) -> Result<ExecResult, String> {
     let project_dir = project_dir.trim();
     if project_dir.is_empty() {
         return Err("projectDir is required".to_string());
     }
 
     let name = validate_skill_name(&name)?;
-    let skill_roots = collect_skill_roots(project_dir)?;
+    let skill_roots = collect_skill_roots(&app, project_dir)?;
     let mut removed = false;
 
     for root in skill_roots {
         let dest = root.join(&name);
         if !dest.exists() {
             continue;
+        }
+
+        // 禁止删除内置技能 (Security/Safety)
+        if let Ok(resource_dir) = app.path().resource_dir() {
+            let built_in_root = resource_dir.join("resources").join("built-in-skills");
+            if dest.starts_with(built_in_root) {
+                return Err("Cannot uninstall built-in skills".to_string());
+            }
         }
 
         fs::remove_dir_all(&dest)
