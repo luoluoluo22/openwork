@@ -8,7 +8,8 @@
       "Bash(git add:*)",
       "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat: add support for built-in skills and set default language to Chinese\n\n- Updated Rust backend to automatically scan for skills in Tauri resources\n- Added antigravity-api as a built-in skill\n- Changed default application language to Chinese \\(zh\\)\n- Updated CLAUDE.md with project-specific instructions\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
       "Bash(git push:*)",
-      "Bash(git commit -m \"$\\(cat <<''EOF''\nchore: update icons and finalized build assets\n\n- Synchronized all app icons across platforms\n- Finalized build configuration and localizations\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nchore: update icons and finalized build assets\n\n- Synchronized all app icons across platforms\n- Finalized build configuration and localizations\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfix: add missing openwrk sidecar and enforce sidecar mode in production\n\n- Added openwrk to externalBin in tauri.conf.json to fix backend startup in release\n- Updated app.tsx to default to sidecar engine source in Tauri production environment\n- Ignored temp_upstream directory in .gitignore\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
     ]
   }
 }

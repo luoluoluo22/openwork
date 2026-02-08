@@ -228,8 +228,10 @@ export default function App() {
 
   const [engineSource, setEngineSource] = createSignal<"path" | "sidecar">(
     (() => {
-      const stored = typeof window !== "undefined" ? window.localStorage.getItem("openwork.engineSource") : null;
-      if (stored === "path" || stored === "sidecar") return stored;
+      if (typeof window === "undefined") return "sidecar";
+      const stored = window.localStorage.getItem("openwork.engineSource");
+      if (stored === "path" || stored === "sidecar") return stored as "path" | "sidecar";
+      // 生产环境下默认强制使用 sidecar
       return isTauriRuntime() ? "sidecar" : "path";
     })()
   );
